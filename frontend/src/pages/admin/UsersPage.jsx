@@ -105,7 +105,7 @@ export default function UsersPage() {
     setLoading(true)
     api.getUsers().then(setUsers).catch(err => setError(err.message)).finally(() => setLoading(false))
   }
-  useEffect(load, [])
+  useEffect(() => { load() }, [])
 
   const filtered = users.filter(u => roleFilter === 'todos' || u.rol === roleFilter)
 

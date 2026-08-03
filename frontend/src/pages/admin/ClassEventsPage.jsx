@@ -11,7 +11,9 @@ export default function ClassEventsPage() {
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
   const load = () => api.getClassEvents({ mine: 'true', include_past: 'true' }).then(setEvents).catch(error => setMessage(error.message))
-  useEffect(load, [])
+  // `load` devuelve una promesa: hay que descartarla, o React la toma como
+  // función de limpieza y revienta con "destroy is not a function".
+  useEffect(() => { load() }, [])
 
   const submit = async (event) => {
     event.preventDefault(); setSaving(true); setMessage('')

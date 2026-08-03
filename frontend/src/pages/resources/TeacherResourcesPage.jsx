@@ -20,7 +20,7 @@ export default function TeacherResourcesPage() {
   const load = () => {
     if (user?.id) api.getResources({ subido_por: user.id, estado: '', activos: 'false' }).then(setResources).catch(() => setMessage('No se pudieron cargar tus recursos.'))
   }
-  useEffect(load, [user?.id])
+  useEffect(() => { load() }, [user?.id])
 
   const submit = async (event) => {
     event.preventDefault(); setSaving(true); setMessage('')
