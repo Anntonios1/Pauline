@@ -211,19 +211,13 @@ def serialize_upload_asset(asset: dict) -> dict:
     }
 
 
-def serve_upload(path: str) -> tuple:
-    """Devuelve (bytes, mime_type) para un archivo de uploads."""
-    safe_path = os.path.basename(path)
-    filepath = os.path.join(UPLOAD_DIR, safe_path)
-    if not os.path.exists(filepath) or not os.path.isfile(filepath):
-        return None, None
-    with open(filepath, "rb") as f:
-        data = f.read()
-    ext = os.path.splitext(filepath)[1].lower()
-    if ext == AVATAR_EXTENSION:
-        # Las fotos de perfil se guardan cifradas; se descifran solo al servirlas.
-        return decrypt_avatar(data)
-    mime = {
+def _upload_path(path: str) -> str:
+    """Ruta absoluta dentro de UPLOAD_DIR. `basename` corta cualquier `../`."""
+    return os.path.join(UPLOAD_DIR, os.path.basename(path))
+
+
+def _mime_for_extension(ext: str) -> str:
+    return {
         ".jpg": "image/jpeg",
         ".jpeg": "image/jpeg",
         ".png": "image/png",
@@ -238,4 +232,96 @@ def serve_upload(path: str) -> tuple:
         ".txt": "text/plain; charset=utf-8",
         ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     }.get(ext, "application/octet-stream")
-    return data, mime
+
+
+def serve_upload(path: str) -> tuple:
+    """Devuelve (bytes, mime_type) para un archivo de uploads, entero en memoria.
+
+    Se conserva para los avatares (que hay que descifrar completos) y para
+    cualquier consumidor que necesite los bytes de una vez. Para servir por HTTP
+    usa `open_upload_stream`, que soporta descarga parcial.
+    """
+    filepath = _upload_path(path)
+    if not os.path.isfile(filepath):
+        return None, None
+    with open(filepath, "rb") as f:
+        data = f.read()
+    ext = os.path.splitext(filepath)[1].lower()
+    if ext == AVATAR_EXTENSION:
+        # Las fotos de perfil se guardan cifradas; se descifran solo al servirlas.
+        return decrypt_avatar(data)
+    return data, _mime_for_extension(ext)
+
+
+def _parse_range(range_header: str, size: int):
+    """Interpreta `Range: bytes=inicio-fin`. Devuelve (inicio, fin) o None.
+
+    Solo se admite un rango: es lo que piden los navegadores al buscar dentro de
+    un video, y soportar listas de rangos obligaría a respuestas multipart.
+    Devolver None significa "servir el archivo completo".
+    """
+    if not range_header or size == 0:
+        return None
+    unit, _, spec = range_header.partition("=")
+    if unit.strip().lower() != "bytes" or "," in spec:
+        return None
+    inicio_raw, sep, fin_raw = spec.strip().partition("-")
+    if not sep:
+        return None
+    try:
+        if not inicio_raw:
+            # `bytes=-500` = los últimos 500 bytes.
+            longitud = int(fin_raw)
+            if longitud <= 0:
+                return None
+            inicio, fin = max(0, size - longitud), size - 1
+        else:
+            inicio = int(inicio_raw)
+            fin = int(fin_raw) if fin_raw else size - 1
+    except ValueError:
+        return None
+    fin = min(fin, size - 1)
+    if inicio > fin or inicio >= size:
+        return None
+    return inicio, fin
+
+
+CHUNK_SIZE = 64 * 1024
+
+
+def open_upload_stream(path: str, range_header: str = None):
+    """Prepara una descarga (posiblemente parcial) de un archivo de uploads.
+
+    Devuelve (iterador, mime, tamano_total, inicio, fin) o None si no existe.
+    Sin esto el servidor cargaba el archivo entero en memoria por petición y el
+    navegador no podía adelantar un video: el seek de <video> necesita
+    respuestas 206 a peticiones Range.
+    """
+    filepath = _upload_path(path)
+    if not os.path.isfile(filepath):
+        return None
+
+    ext = os.path.splitext(filepath)[1].lower()
+    if ext == AVATAR_EXTENSION:
+        # Cifrado: hay que descifrarlo completo, no admite descarga parcial.
+        data, mime = serve_upload(path)
+        if data is None:
+            return None
+        return iter([data]), mime, len(data), 0, len(data) - 1
+
+    size = os.path.getsize(filepath)
+    rango = _parse_range(range_header, size)
+    inicio, fin = rango if rango else (0, max(0, size - 1))
+
+    def bloques():
+        restante = fin - inicio + 1
+        with open(filepath, "rb") as f:
+            f.seek(inicio)
+            while restante > 0:
+                bloque = f.read(min(CHUNK_SIZE, restante))
+                if not bloque:
+                    break
+                restante -= len(bloque)
+                yield bloque
+
+    return bloques(), _mime_for_extension(ext), size, inicio, fin

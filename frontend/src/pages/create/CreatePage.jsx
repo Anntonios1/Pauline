@@ -3,8 +3,9 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { useData } from '../../contexts/DataContext'
 import * as api from '../../services/api'
-import { ChevronLeft, ChevronRight, Send, X, CheckCircle, AlertCircle, Image as ImageIcon, Loader } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Send, X, CheckCircle, AlertCircle, Image as ImageIcon, Loader, Paperclip } from 'lucide-react'
 import PublicationStylePicker from '../../components/publications/PublicationStylePicker'
+import ResourceLibraryPicker from '../../components/media/ResourceLibraryPicker'
 
 /* ---- Paso 1: Propósito ---- */
 const PROPOSITOS = [
@@ -70,6 +71,8 @@ export default function CreatePage() {
   const [imageError, setImageError] = useState('')
   const [imageUploadWarning, setImageUploadWarning] = useState('')
   const [estiloVisual, setEstiloVisual] = useState({ acento: 'turquesa', patron: 'liso' })
+  const [recursosAdjuntos, setRecursosAdjuntos] = useState([])
+  const [showLibrary, setShowLibrary] = useState(false)
   const [enviado, setEnviado] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
@@ -156,6 +159,13 @@ export default function CreatePage() {
           await api.uploadCoverImage(pubId, imageFile)
         } catch (err) {
           setImageUploadWarning(`La publicación se envió, pero no se pudo guardar la imagen: ${err.message}`)
+        }
+      }
+      if (pubId && recursosAdjuntos.length) {
+        try {
+          await Promise.all(recursosAdjuntos.map(r => api.addResourceToPublication(pubId, r.id)))
+        } catch (err) {
+          setImageUploadWarning(`La publicación se envió, pero no se pudieron adjuntar todos los recursos: ${err.message}`)
         }
       }
 
@@ -334,6 +344,33 @@ export default function CreatePage() {
             )}
           </div>
 
+          {isTeacher && (
+            <div>
+              <label className="block text-sm font-extrabold text-slate-700 mb-1.5">
+                Recursos adjuntos <span className="font-normal text-[color:var(--ar-muted)]">(opcional)</span>
+              </label>
+              {recursosAdjuntos.length > 0 && (
+                <ul className="mb-2 space-y-1">
+                  {recursosAdjuntos.map((r) => (
+                    <li key={r.id} className="flex items-center justify-between gap-2 rounded-lg bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700">
+                      <span className="truncate">{r.nombre}</span>
+                      <button type="button" onClick={() => setRecursosAdjuntos(recursosAdjuntos.filter(x => x.id !== r.id))} className="text-slate-400 hover:text-rose-600">
+                        <X size={14} />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <button
+                type="button"
+                onClick={() => setShowLibrary(true)}
+                className="inline-flex items-center gap-2 rounded-xl border border-dashed border-[color:var(--ar-primary)] px-3 py-2 text-xs font-bold text-[color:var(--ar-primary)] hover:bg-[color:var(--ar-primary-light)]"
+              >
+                <Paperclip size={14} /> Adjuntar PDF, audio o imagen de mi biblioteca
+              </button>
+            </div>
+          )}
+
           <div>
             <label className="block text-sm font-extrabold text-slate-700 mb-1.5">Título *</label>
             <input
@@ -504,6 +541,16 @@ export default function CreatePage() {
             <ChevronRight size={20} />
           </button>
         </div>
+      )}
+
+      {showLibrary && (
+        <ResourceLibraryPicker
+          onClose={() => setShowLibrary(false)}
+          onSelect={(elegido) => {
+            if (!recursosAdjuntos.some(r => r.id === elegido.id)) setRecursosAdjuntos([...recursosAdjuntos, elegido])
+            setShowLibrary(false)
+          }}
+        />
       )}
     </div>
   )

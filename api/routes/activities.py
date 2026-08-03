@@ -47,7 +47,12 @@ def list_activities(handler, params, query, body):
     except ValueError:
         return {"error": "creador_id debe ser un entero"}, 400
     q = (query.get("q") or query.get("search") or "").strip()[:200] or None
-    return listar_actividades(area=area, dificultad=dificultad, activas=activas, creado_por=creador_id, q=q)
+    usuario = get_user_from_token(handler)
+    return listar_actividades(
+        area=area, dificultad=dificultad, activas=activas, creado_por=creador_id, q=q,
+        viewer_id=usuario["id"] if usuario else None,
+        is_admin=bool(usuario and usuario["rol"] == "administrador"),
+    )
 
 
 def get_activity(handler, params, query, body):
@@ -69,7 +74,7 @@ def get_activity(handler, params, query, body):
         can_manage = bool(user) and (
             user["rol"] == "administrador" or meta["creado_por"] == user["id"]
         )
-        if (meta["estado"] != "publicado" or not meta["activa"]) and not can_manage:
+        if (meta["estado"] != "publicado" or not meta["activa"] or meta.get("privado")) and not can_manage:
             return {"error": "Actividad no encontrada o todavía no publicada"}, 404
         quiz = obtener_quiz_por_actividad(actividad_id, include_answers=can_manage)
         actividad["quiz"] = quiz

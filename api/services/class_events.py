@@ -39,12 +39,13 @@ def crear_evento_clase(datos, actor_id):
     try:
         cursor = conn.execute("""
             INSERT INTO eventos_clase
-                (titulo, descripcion, tipo, fecha_inicio, fecha_fin, lugar, color, creado_por)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                (titulo, descripcion, tipo, fecha_inicio, fecha_fin, lugar, color, etiqueta, actividad_id, creado_por)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             datos["titulo"].strip(), datos.get("descripcion"), datos.get("tipo", "clase"),
             datos["fecha_inicio"], datos.get("fecha_fin") or None, datos.get("lugar"),
-            datos.get("color", "teal"), actor_id,
+            datos.get("color", "teal"), (datos.get("etiqueta") or "").strip() or None,
+            datos.get("actividad_id") or None, actor_id,
         ))
         conn.commit()
         return obtener_evento_clase(cursor.lastrowid)
@@ -53,7 +54,7 @@ def crear_evento_clase(datos, actor_id):
 
 
 def actualizar_evento_clase(evento_id, datos):
-    allowed = {"titulo", "descripcion", "tipo", "fecha_inicio", "fecha_fin", "lugar", "color", "activo"}
+    allowed = {"titulo", "descripcion", "tipo", "fecha_inicio", "fecha_fin", "lugar", "color", "activo", "actividad_id", "etiqueta"}
     fields, values = [], []
     for field in allowed:
         if field in datos:

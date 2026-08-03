@@ -34,6 +34,7 @@ import GameLauncherPage from './pages/game/GameLauncherPage'
 import GameRoomPage from './pages/game/GameRoomPage'
 import GameJoinPage from './pages/game/GameJoinPage'
 import TeacherCreatorPage from './pages/teacher/TeacherCreatorPage'
+import MyQuizzesPage from './pages/teacher/MyQuizzesPage'
 
 // Teacher/Admin pages
 import AdminDashboard from './pages/admin/AdminDashboard'
@@ -105,7 +106,9 @@ function App() {
 
           {/* Creación de contenido y Game Creator */}
           <Route path="crear"        element={<CreatePage />} />
-          <Route path="crear-juego"  element={<TeacherCreatorPage />} />
+          <Route path="crear-juego"     element={<TeacherCreatorPage />} />
+          <Route path="crear-juego/:id" element={<TeacherCreatorPage />} />
+          <Route path="mis-quizzes"  element={<MyQuizzesPage />} />
           <Route path="juegos"       element={<GameLauncherPage />} />
           <Route path="sala/:code"   element={<GameRoomPage />} />
 

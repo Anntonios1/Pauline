@@ -30,6 +30,8 @@ def init_db(path: Optional[str] = None) -> None:
         _ensure_quiz_media_video_support(conn)
         _ensure_room_columns(conn)
         _ensure_publication_style_column(conn)
+        _ensure_event_columns(conn)
+        _ensure_quiz_privacy_column(conn)
         conn.commit()
     finally:
         close_db(conn)
@@ -105,6 +107,25 @@ def _ensure_publication_style_column(conn: sqlite3.Connection) -> None:
         conn.execute(
             "ALTER TABLE publicaciones ADD COLUMN estilo_visual TEXT NOT NULL DEFAULT '{}'"
         )
+
+
+def _ensure_event_columns(conn: sqlite3.Connection) -> None:
+    """Vincula un evento de agenda a un quiz dinámico (actividades.id)."""
+    tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
+    if "eventos_clase" not in tables:
+        return
+    if "actividad_id" not in _column_names(conn, "eventos_clase"):
+        conn.execute("ALTER TABLE eventos_clase ADD COLUMN actividad_id INTEGER REFERENCES actividades(id) ON DELETE SET NULL")
+    if "etiqueta" not in _column_names(conn, "eventos_clase"):
+        conn.execute("ALTER TABLE eventos_clase ADD COLUMN etiqueta TEXT")
+
+
+def _ensure_quiz_privacy_column(conn: sqlite3.Connection) -> None:
+    tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
+    if "quizzes" not in tables:
+        return
+    if "privado" not in _column_names(conn, "quizzes"):
+        conn.execute("ALTER TABLE quizzes ADD COLUMN privado INTEGER NOT NULL DEFAULT 0 CHECK (privado IN (0,1))")
 
 
 def list_to_dicts(rows: list) -> list:

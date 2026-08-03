@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import {
   AlertCircle,
   ArrowDown,
@@ -26,8 +26,10 @@ import {
 import { useAuth } from '../../contexts/AuthContext'
 import { useData } from '../../contexts/DataContext'
 import { PageHeader, Card, SectionTitle } from '../../components/ui'
-import { handleUnauthorized } from '../../services/api'
+import { handleUnauthorized, getQuiz, createQuiz, updateQuiz } from '../../services/api'
 import { quizToJson, quizFromJson } from '../../utils/quizJson'
+import ResourceLibraryPicker from '../../components/media/ResourceLibraryPicker'
+import { EmbedExterno, clasificarEmbed } from '../../components/media/MediaEngine'
 
 const BLOCK_TYPES = [
   {
@@ -73,9 +75,11 @@ const BLOCK_TYPES = [
     colorClass: 'bg-slate-200 text-slate-700',
   },
   {
+    // El valor sigue siendo 'wordwall' por compatibilidad con los quizzes ya
+    // creados; lo que cambió es que admite cualquier enlace, no solo Wordwall.
     value: 'wordwall',
-    label: 'Juego de Wordwall',
-    description: 'Incrusta un juego ya creado en wordwall.net.',
+    label: 'Incrustar contenido',
+    description: 'Juego de Wordwall, video de YouTube o cualquier enlace.',
     icon: Gamepad2,
     colorClass: 'bg-fuchsia-100 text-fuchsia-700',
   },
@@ -84,9 +88,6 @@ const BLOCK_TYPES = [
 const BLOCK_TYPE_BY_VALUE = Object.fromEntries(BLOCK_TYPES.map((type) => [type.value, type]))
 const QUESTION_TYPES = new Set(['single_choice', 'multiple_choice', 'true_false', 'short_text'])
 const CHOICE_TYPES = new Set(['single_choice', 'multiple_choice'])
-// Dominios embebibles: deben coincidir con ALLOWED_EMBED_HOSTS en api/services/quizzes.py.
-const ALLOWED_EMBED_HOSTS = ['wordwall.net']
-
 function parseEmbedUrl(input) {
   if (!input) return ''
   const trimmed = input.trim()
@@ -95,11 +96,12 @@ function parseEmbedUrl(input) {
   return (iframeMatch ? iframeMatch[1] : trimmed).trim()
 }
 
+/* Se acepta cualquier dominio, pero solo por https: sin cifrar, el contenido
+   puede alterarse en tránsito antes de llegar al aula. El backend valida lo
+   mismo y además decide cómo incrustarlo (ver _embed_kind en services/quizzes.py). */
 function isAllowedEmbedUrl(url) {
   try {
-    const parsed = new URL(url)
-    if (parsed.protocol !== 'https:') return false
-    return ALLOWED_EMBED_HOSTS.some((host) => parsed.hostname === host || parsed.hostname.endsWith(`.${host}`))
+    return new URL(url).protocol === 'https:'
   } catch {
     return false
   }
@@ -142,6 +144,7 @@ function createOption() {
     id: createId(),
     texto: '',
     correcta: false,
+    feedback: '',
     media: [],
   }
 }
@@ -308,6 +311,8 @@ function serializeItem(item, index) {
       id: option.id,
       texto: option.texto.trim(),
       correcta: option.correcta,
+      // Retroalimentación propia de la opción: el motor la muestra al elegirla.
+      feedback: (option.feedback || '').trim(),
       media: cleanMedia(option.media),
     })),
     respuesta_correcta: respuestaCorrecta,
@@ -315,7 +320,9 @@ function serializeItem(item, index) {
     puntos: Number(item.puntos),
     tiempo_segundos: Number(item.tiempo_segundos),
     media: cleanMedia(item.media),
-    config: esWordwall ? { ...item.config, wordwall_url: parseEmbedUrl(item.config?.wordwall_url) } : (item.config || {}),
+    config: esWordwall
+      ? { ...item.config, embed_url: parseEmbedUrl(item.config?.embed_url ?? item.config?.wordwall_url) }
+      : (item.config || {}),
   }
 }
 
@@ -357,9 +364,9 @@ function validateQuiz(form, items) {
         errors.push('Agrega texto, una imagen o un audio.')
       }
     } else if (item.tipo === 'wordwall') {
-      const url = parseEmbedUrl(item.config?.wordwall_url)
-      if (!url) errors.push('Pega el enlace o el código <iframe> que te da Wordwall al insertar.')
-      else if (!isAllowedEmbedUrl(url)) errors.push('Solo se admiten enlaces de wordwall.net.')
+      const url = parseEmbedUrl(item.config?.embed_url ?? item.config?.wordwall_url)
+      if (!url) errors.push('Pega el enlace del contenido que quieres incrustar, o su código <iframe>.')
+      else if (!isAllowedEmbedUrl(url)) errors.push('El enlace debe empezar por https:// para poder incrustarse.')
     } else if (item.tipo === 'flashcard') {
       if (!item.enunciado.trim()) errors.push('Escribe el frente de la ficha.')
       if (!item.contenido.trim()) errors.push('Escribe el reverso de la ficha.')
@@ -444,6 +451,10 @@ function MediaPreview({ asset }) {
     return <audio src={source} controls className="w-full" preload="metadata" />
   }
 
+  if (asset.tipo === 'video') {
+    return <video src={source} controls className="h-32 w-full rounded-lg bg-black" preload="metadata" />
+  }
+
   return (
     <div className="flex items-center gap-2 rounded-lg bg-slate-100 p-3 text-sm text-slate-600">
       <File size={18} />
@@ -453,6 +464,8 @@ function MediaPreview({ asset }) {
 }
 
 function MediaPicker({ media, onChange, compact = false, maxItems = 4 }) {
+  const [showLibrary, setShowLibrary] = useState(false)
+
   const addFiles = (fileList) => {
     const available = Math.max(0, maxItems - media.length)
     const selected = Array.from(fileList).slice(0, available)
@@ -522,22 +535,51 @@ function MediaPicker({ media, onChange, compact = false, maxItems = 4 }) {
       )}
 
       {media.length < maxItems && (
-        <label className={`inline-flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-teal-300 bg-teal-50 font-bold text-teal-700 hover:bg-teal-100 ${compact ? 'px-2.5 py-1.5 text-xs' : 'px-3 py-2 text-sm'}`}>
-          <Image size={compact ? 14 : 16} />
-          {compact ? 'Añadir imagen o audio' : 'Adjuntar imagen, audio o archivo'}
-          <input
-            type="file"
-            multiple={maxItems > 1}
-            accept="image/*,audio/*,video/mp4,video/webm,.pdf"
-            className="sr-only"
-            onChange={(event) => {
-              addFiles(event.target.files)
-              event.target.value = ''
-            }}
-          />
-        </label>
+        <div className="flex flex-wrap gap-2">
+          <label className={`inline-flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-teal-300 bg-teal-50 font-bold text-teal-700 hover:bg-teal-100 ${compact ? 'px-2.5 py-1.5 text-xs' : 'px-3 py-2 text-sm'}`}>
+            <Image size={compact ? 14 : 16} />
+            {compact ? 'Añadir imagen o audio' : 'Adjuntar imagen, audio o archivo'}
+            <input
+              type="file"
+              multiple={maxItems > 1}
+              accept="image/*,audio/*,video/mp4,video/webm,.pdf"
+              className="sr-only"
+              onChange={(event) => {
+                addFiles(event.target.files)
+                event.target.value = ''
+              }}
+            />
+          </label>
+          <button
+            type="button"
+            onClick={() => setShowLibrary(true)}
+            className={`inline-flex items-center gap-2 rounded-lg border border-dashed border-violet-300 bg-violet-50 font-bold text-violet-700 hover:bg-violet-100 ${compact ? 'px-2.5 py-1.5 text-xs' : 'px-3 py-2 text-sm'}`}
+          >
+            <Upload size={compact ? 14 : 16} />
+            Elegir de mi biblioteca
+          </button>
+        </div>
       )}
       {!compact && <p className="text-xs text-slate-500">La vista previa es local; los archivos se subirán al publicar.</p>}
+
+      {showLibrary && (
+        <ResourceLibraryPicker
+          onClose={() => setShowLibrary(false)}
+          onSelect={(elegido) => {
+            onChange([...media, {
+              id: createId(),
+              tipo: elegido.tipo,
+              nombre: elegido.nombre,
+              alt: '',
+              url: elegido.url,
+              previewUrl: elegido.url,
+              status: 'uploaded',
+              error: '',
+            }])
+            setShowLibrary(false)
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -594,7 +636,16 @@ function ChoiceEditor({ block, onChange }) {
               <Trash2 size={16} />
             </button>
           </div>
-          <div className="ml-6 mt-2">
+          <div className="ml-6 mt-2 space-y-2">
+            <input
+              value={option.feedback || ''}
+              onChange={(event) => updateOption(option.id, { feedback: event.target.value })}
+              placeholder={option.correcta
+                ? 'Por qué es correcta (opcional)'
+                : 'Por qué no es correcta (opcional)'}
+              maxLength={2000}
+              className="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs outline-none focus:border-teal-500"
+            />
             <MediaPicker
               media={option.media}
               onChange={(media) => updateOption(option.id, { media })}
@@ -618,18 +669,30 @@ function ChoiceEditor({ block, onChange }) {
   )
 }
 
-function WordwallBlockFields({ block, onChange }) {
-  const raw = block.config?.wordwall_url || ''
+/* Un solo bloque para todo lo que se incrusta: juegos de Wordwall, videos de
+   YouTube/Vimeo, un MP4 alojado en otro sitio o cualquier página. El backend
+   clasifica el enlace y decide cómo mostrarlo; aquí solo se avisa de qué va a
+   pasar para que el docente no se lleve sorpresas en clase. */
+function EmbedBlockFields({ block, onChange }) {
+  const raw = block.config?.embed_url ?? block.config?.wordwall_url ?? ''
   const parsedUrl = parseEmbedUrl(raw)
   const isValid = parsedUrl && isAllowedEmbedUrl(parsedUrl)
+  const kind = isValid ? clasificarEmbed(parsedUrl) : ''
+
+  const aviso = {
+    video: 'Se reproducirá con el reproductor propio de la app, sin salir del quiz.',
+    trusted: 'Plataforma reconocida: se incrusta con su reproductor oficial.',
+    external: 'Sitio externo: se incrusta en modo restringido y se mostrará de qué dominio viene.',
+  }[kind]
 
   return (
     <div className="space-y-4">
       <div className="flex items-start gap-2 rounded-xl border border-fuchsia-200 bg-fuchsia-50 p-3 text-xs text-fuchsia-900">
         <Gamepad2 size={16} className="mt-0.5 shrink-0" />
         <p>
-          En <strong>wordwall.net</strong> abre tu juego → <strong>Compartir → Insertar (Embed)</strong> y pega aquí
-          el enlace, o directamente el código <code>&lt;iframe&gt;</code> completo — lo detectamos igual.
+          Pega el enlace de un juego de <strong>Wordwall</strong>, un video de <strong>YouTube</strong> o
+          <strong> Vimeo</strong>, un archivo <strong>.mp4</strong> alojado en otro sitio, o cualquier página.
+          También puedes pegar el código <code>&lt;iframe&gt;</code> completo — lo detectamos igual.
         </p>
       </div>
 
@@ -644,33 +707,27 @@ function WordwallBlockFields({ block, onChange }) {
       </div>
 
       <div>
-        <label className={LABEL_CLASS}>Enlace o código de Wordwall</label>
+        <label className={LABEL_CLASS}>Enlace o código para incrustar</label>
         <textarea
           value={raw}
-          onChange={(event) => onChange({ config: { ...block.config, wordwall_url: event.target.value } })}
+          onChange={(event) => onChange({ config: { ...block.config, embed_url: event.target.value } })}
           rows={3}
-          placeholder="https://wordwall.net/es/embed/… o <iframe src=…>"
+          placeholder="https://wordwall.net/es/embed/…, https://youtube.com/watch?v=…, https://…/clase.mp4"
           className={`${FIELD_CLASS} resize-y font-mono text-xs`}
         />
         {raw && !isValid && (
           <p className="mt-1 text-xs font-semibold text-rose-700">
-            Solo se admiten enlaces https de wordwall.net. Revisa que copiaste el enlace de "Insertar", no el de "Compartir".
+            El enlace debe empezar por https:// — revisa que copiaste la dirección completa.
           </p>
         )}
+        {aviso && <p className="mt-1 text-xs font-semibold text-slate-500">{aviso}</p>}
       </div>
 
       {isValid && (
         <div>
           <label className={LABEL_CLASS}>Vista previa</label>
-          <div className="overflow-hidden rounded-xl border border-slate-200" style={{ aspectRatio: '4 / 3' }}>
-            <iframe
-              src={parsedUrl}
-              title="Vista previa del juego de Wordwall"
-              className="h-full w-full"
-              sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
-              loading="lazy"
-            />
-          </div>
+          {/* Lo mismo que verá el estudiante: el motor decide según la capa. */}
+          <EmbedExterno url={parsedUrl} kind={kind} titulo={block.enunciado} />
         </div>
       )}
     </div>
@@ -740,7 +797,7 @@ function BlockEditor({ block, index, total, errors, onChange, onRemove, onMove, 
         )}
 
         {block.tipo === 'wordwall' ? (
-          <WordwallBlockFields block={block} onChange={onChange} />
+          <EmbedBlockFields block={block} onChange={onChange} />
         ) : block.tipo === 'info' ? (
           <>
             <div>
@@ -992,6 +1049,7 @@ export default function TeacherCreatorPage() {
   const { token } = useAuth()
   const { categories, refresh } = useData()
   const navigate = useNavigate()
+  const { id } = useParams()
 
   const [form, setForm] = useState({
     titulo: '',
@@ -1001,6 +1059,9 @@ export default function TeacherCreatorPage() {
     categoria_id: '',
     dificultad: 'basica',
     intentos_maximos: 2,
+    privado: false,
+    // Medios del quiz completo (no de un bloque). Van al backend como `media`.
+    media: [],
     config: {
       barajar_preguntas: false,
       barajar_opciones: false,
@@ -1021,6 +1082,46 @@ export default function TeacherCreatorPage() {
   const [submitStage, setSubmitStage] = useState('')
   const [submitError, setSubmitError] = useState('')
   const [success, setSuccess] = useState(null)
+  const [isLoadingQuiz, setIsLoadingQuiz] = useState(!!id)
+  const [loadError, setLoadError] = useState('')
+
+  useEffect(() => {
+    if (!id) return
+    let cancelado = false
+    setIsLoadingQuiz(true)
+    setLoadError('')
+    getQuiz(id)
+      .then((quiz) => {
+        if (cancelado) return
+        const { form: cargado, items: cargadosItems } = quizFromJson(quiz)
+        const coverUrl = cargado.config?.feed_card?.cover_url
+        setForm({
+          ...cargado,
+          categoria_id: quiz.categoria_id != null ? String(quiz.categoria_id) : '',
+          privado: Boolean(quiz.privado),
+          // La portada viaja también dentro de `media`; se excluye aquí para no
+          // mostrarla dos veces ni duplicarla al volver a guardar.
+          media: (Array.isArray(quiz.media) ? quiz.media : [])
+            .filter((asset) => asset.url && asset.url !== coverUrl)
+            .map((asset) => ({
+              id: createId(),
+              tipo: asset.tipo || asset.type || 'file',
+              nombre: asset.nombre_archivo || asset.filename || '',
+              alt: asset.texto_alternativo || asset.alt_text || '',
+              url: asset.url,
+              previewUrl: asset.url,
+              file: null,
+              status: 'uploaded',
+              error: '',
+            })),
+        })
+        setItems(cargadosItems)
+        setCover(coverUrl ? { file: null, previewUrl: coverUrl } : null)
+      })
+      .catch((error) => !cancelado && setLoadError(error.message || 'No se pudo cargar el quiz.'))
+      .finally(() => !cancelado && setIsLoadingQuiz(false))
+    return () => { cancelado = true }
+  }, [id])
 
   const updateForm = (field, value) => {
     setForm((current) => {
@@ -1168,6 +1269,19 @@ export default function TeacherCreatorPage() {
       const preparedItems = await uploadPendingMedia(items, token, setItems)
       setItems(preparedItems)
 
+      // Los medios del quiz siguen el mismo camino que los de un bloque: los
+      // que ya traen `url` (elegidos de la biblioteca) no se vuelven a subir.
+      const quizMedia = []
+      for (const asset of form.media) {
+        if (asset.url) {
+          quizMedia.push(asset)
+          continue
+        }
+        if (!asset.file) continue
+        const subido = await uploadMediaAsset(asset.file, token)
+        quizMedia.push({ ...asset, ...subido })
+      }
+
       const payload = {
         titulo: form.titulo.trim(),
         descripcion: form.descripcion.trim(),
@@ -1176,6 +1290,7 @@ export default function TeacherCreatorPage() {
         categoria_id: form.categoria_id ? Number(form.categoria_id) : null,
         dificultad: form.dificultad,
         intentos_maximos: Number(form.intentos_maximos),
+        privado: Boolean(form.privado),
         config: {
           ...form.config,
           feed_card: {
@@ -1185,27 +1300,16 @@ export default function TeacherCreatorPage() {
           tiempo_global_segundos: Number(form.config.tiempo_global_segundos),
           aprobado_porcentaje: Number(form.config.aprobado_porcentaje),
         },
-        media: uploadedCover ? [uploadedCover] : [],
+        media: [...(uploadedCover ? [uploadedCover] : []), ...cleanMedia(quizMedia)],
         items: preparedItems.map(serializeItem),
       }
 
-      setSubmitStage('Creando el quiz completo…')
-      const response = await fetch('/api/quizzes', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify(payload),
-      })
-      if (response.status === 401) {
-        handleUnauthorized()
-        throw new Error('Tu sesión expiró. Vuelve a iniciar sesión.')
-      }
-      const body = await response.json().catch(() => null)
-
-      if (!response.ok) {
-        throw new Error(displayApiError(body, 'No fue posible crear el quiz.'))
+      setSubmitStage(id ? 'Guardando los cambios…' : 'Creando el quiz completo…')
+      let body
+      try {
+        body = id ? await updateQuiz(id, payload) : await createQuiz(payload)
+      } catch (error) {
+        throw new Error(error.message || (id ? 'No fue posible guardar el quiz.' : 'No fue posible crear el quiz.'))
       }
 
       setSuccess({ id: body?.actividad_id || body?.id || body?.quiz_id, title: form.titulo.trim() })
@@ -1224,10 +1328,26 @@ export default function TeacherCreatorPage() {
 
   const totalPoints = items.reduce((sum, item) => sum + (QUESTION_TYPES.has(item.tipo) ? Number(item.puntos) || 0 : 0), 0)
 
+  if (isLoadingQuiz) {
+    return (
+      <div className="mx-auto max-w-6xl animate-fade-in py-16 text-center text-slate-500">
+        <Loader2 size={28} className="mx-auto mb-3 animate-spin" />
+        Cargando el quiz…
+      </div>
+    )
+  }
+  if (loadError) {
+    return (
+      <div className="mx-auto max-w-6xl animate-fade-in py-16 text-center">
+        <p className="font-bold text-rose-700">{loadError}</p>
+      </div>
+    )
+  }
+
   return (
     <div className="mx-auto max-w-6xl animate-fade-in space-y-6 pb-10">
       <PageHeader
-        title="Constructor de quizzes interactivos"
+        title={id ? 'Editar quiz' : 'Constructor de quizzes interactivos'}
         subtitle="Combina preguntas, fichas, imágenes y audio. El motor unificado mostrará los bloques en el orden que definas."
       >
         <div className="mt-4 flex flex-wrap gap-2 text-xs font-bold text-white/90">
@@ -1297,6 +1417,18 @@ export default function TeacherCreatorPage() {
               </select>
             </div>
 
+            <div className="flex items-end">
+              <label className="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm font-bold text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={form.privado}
+                  onChange={(event) => updateForm('privado', event.target.checked)}
+                  className="h-4 w-4 rounded border-slate-300 text-teal-600"
+                />
+                Privado (solo tú lo ves)
+              </label>
+            </div>
+
             <div className="md:col-span-2">
               <label className={LABEL_CLASS}>Descripción</label>
               <textarea
@@ -1327,6 +1459,15 @@ export default function TeacherCreatorPage() {
                   setCover({ file, previewUrl: URL.createObjectURL(file) })
                 }} />
               </label>
+            </div>
+
+            <div className="md:col-span-2">
+              <label className={LABEL_CLASS}>Material de apoyo del quiz</label>
+              <p className="mb-2 text-xs text-slate-500">
+                Audios, PDF, videos o imágenes que valen para todo el quiz, no para un bloque suelto.
+                El estudiante los tendrá a mano en todo momento mientras responde.
+              </p>
+              <MediaPicker media={form.media} onChange={(media) => updateForm('media', media)} maxItems={6} />
             </div>
 
             <div className="md:col-span-2">
@@ -1540,7 +1681,7 @@ export default function TeacherCreatorPage() {
             <div className="flex flex-wrap items-center gap-3">
               <CheckCircle2 className="flex-shrink-0" size={22} />
               <div className="min-w-0 flex-1">
-                <p className="font-extrabold">Quiz creado correctamente</p>
+                <p className="font-extrabold">{id ? 'Quiz actualizado correctamente' : 'Quiz creado correctamente'}</p>
                 <p className="truncate text-sm font-semibold">“{success.title}” ya quedó guardado con todos sus bloques.</p>
               </div>
               <button
@@ -1569,7 +1710,7 @@ export default function TeacherCreatorPage() {
               className="inline-flex min-w-48 items-center justify-center gap-2 rounded-xl bg-teal-600 px-5 py-3 text-sm font-extrabold text-white shadow-sm hover:bg-teal-700 disabled:cursor-wait disabled:opacity-60"
             >
               {isSaving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
-              {isSaving ? 'Publicando…' : 'Publicar quiz'}
+              {isSaving ? 'Guardando…' : id ? 'Guardar cambios' : 'Publicar quiz'}
             </button>
           </div>
         </div>

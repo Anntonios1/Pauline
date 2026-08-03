@@ -42,6 +42,7 @@ const teacherSections = [
       { path: '/admin',             label: 'Inicio',                icon: Home },
       { path: '/admin/juegos',      label: 'Quizzes interactivos', icon: Sparkles },
       { path: '/admin/crear-juego', label: 'Crear quiz',            icon: Plus },
+      { path: '/admin/mis-quizzes', label: 'Mis quizzes',           icon: ClipboardList },
       { path: '/admin/lecturas',    label: 'Lecturas',              icon: BookOpen },
       { path: '/admin/actividades', label: 'Actividades',          icon: ClipboardList },
       { path: '/admin/recursos',    label: 'Recursos',             icon: FolderOpen },

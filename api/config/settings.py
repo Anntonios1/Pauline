@@ -13,7 +13,7 @@ ATTEMPT_ABANDON_AFTER_MINUTES = int(os.environ.get("ATTEMPT_ABANDON_AFTER_MINUTE
 # Directorio para archivos subidos
 UPLOAD_DIR = os.path.join(os.path.dirname(BASE_DIR), "uploads")
 MAX_UPLOAD_SIZE_BYTES = int(os.environ.get("MAX_UPLOAD_SIZE_BYTES", str(5 * 1024 * 1024)))  # 5 MB
-MAX_QUIZ_MEDIA_SIZE_BYTES = int(os.environ.get("MAX_QUIZ_MEDIA_SIZE_BYTES", str(20 * 1024 * 1024)))
+MAX_QUIZ_MEDIA_SIZE_BYTES = int(os.environ.get("MAX_QUIZ_MEDIA_SIZE_BYTES", str(100 * 1024 * 1024)))
 ALLOWED_IMAGE_TYPES = {
     "image/jpeg": ".jpg",
     "image/png": ".png",

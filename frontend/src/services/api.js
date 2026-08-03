@@ -111,6 +111,22 @@ export async function getQuiz(activityId) {
   return fetchWithAuth(`/activities/${activityId}/quiz`)
 }
 
+export async function createQuiz(payload) {
+  return fetchWithAuth('/quizzes', { method: 'POST', body: JSON.stringify(payload) })
+}
+
+export async function updateQuiz(activityId, payload) {
+  return fetchWithAuth(`/quizzes/${activityId}`, { method: 'PATCH', body: JSON.stringify(payload) })
+}
+
+export async function publishQuiz(activityId) {
+  return fetchWithAuth(`/quizzes/${activityId}/publish`, { method: 'POST' })
+}
+
+export async function archiveQuiz(activityId) {
+  return fetchWithAuth(`/quizzes/${activityId}`, { method: 'DELETE' })
+}
+
 export async function createAttempt(actividadId) {
   return fetchWithAuth('/attempts', {
     method: 'POST',
@@ -153,6 +169,22 @@ export async function uploadResourceMedia(file) {
   const data = await response.json().catch(() => null)
   if (!response.ok) throw new Error(data?.error || `Error ${response.status}`)
   return data
+}
+
+export async function addResourceToPublication(publicationId, recursoId) {
+  return fetchWithAuth(`/publications/${publicationId}/resources`, {
+    method: 'POST', body: JSON.stringify({ recurso_id: recursoId }),
+  })
+}
+
+export async function getPublicationResources(publicationId) {
+  return fetchWithAuth(`/publications/${publicationId}/resources`)
+}
+
+export async function addResourceToActivity(activityId, recursoId) {
+  return fetchWithAuth(`/activities/${activityId}/resources`, {
+    method: 'POST', body: JSON.stringify({ recurso_id: recursoId }),
+  })
 }
 
 export async function createComment(publicationId, contenido, parentId = null) {

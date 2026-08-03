@@ -431,6 +431,8 @@ CREATE TABLE IF NOT EXISTS eventos_clase (
     fecha_fin        TEXT,
     lugar            TEXT,
     color            TEXT NOT NULL DEFAULT 'teal',
+    etiqueta         TEXT,
+    actividad_id     INTEGER REFERENCES actividades(id) ON DELETE SET NULL,
     creado_por       INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE RESTRICT,
     activo           INTEGER NOT NULL DEFAULT 1 CHECK (activo IN (0,1)),
     fecha_creacion   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
@@ -598,6 +600,7 @@ CREATE TABLE IF NOT EXISTS quizzes (
     version_actual      INTEGER NOT NULL DEFAULT 1 CHECK (version_actual > 0),
     estado              TEXT NOT NULL DEFAULT 'borrador'
                         CHECK (estado IN ('borrador','publicado','archivado')),
+    privado             INTEGER NOT NULL DEFAULT 0 CHECK (privado IN (0,1)),
     configuracion       TEXT NOT NULL DEFAULT '{}' CHECK (json_valid(configuracion)),
     creado_por          INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE RESTRICT,
     fecha_creacion      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),

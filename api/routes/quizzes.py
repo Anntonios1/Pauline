@@ -80,7 +80,7 @@ def get_quiz(handler, params, query, body):
         return {"error": "Quiz no encontrado"}, 404
     user = get_user_from_token(handler)
     can_manage = _can_manage(user, meta)
-    if (meta["estado"] != "publicado" or not meta["activa"]) and not can_manage:
+    if (meta["estado"] != "publicado" or not meta["activa"] or meta.get("privado")) and not can_manage:
         return {"error": "Quiz no encontrado o todavía no publicado"}, 404
     return obtener_quiz_por_actividad(activity_id, include_answers=can_manage)
 

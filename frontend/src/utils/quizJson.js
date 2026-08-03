@@ -65,6 +65,7 @@ export function quizToJson(form, items) {
       opciones: (item.opciones || []).map((op) => ({
         texto: texto(op.texto),
         correcta: Boolean(op.correcta),
+        feedback: texto(op.feedback),
         media: (op.media || []).map(limpiarMedia),
       })),
       respuesta_correcta: texto(item.respuesta_correcta),
@@ -161,7 +162,7 @@ function importarItem(crudo, indice) {
   // config. Al importar hay que deshacer eso para que el editor muestre su
   // formulario, igual que serializeItem lo rehace al guardar.
   let tipo = texto(crudo.tipo) || 'single_choice'
-  if (tipo === 'info' && config.wordwall_url) tipo = 'wordwall'
+  if (tipo === 'info' && (config.embed_url || config.wordwall_url)) tipo = 'wordwall'
 
   if (!TIPOS_VALIDOS.has(tipo)) {
     throw new Error(`${donde}: tipo de bloque desconocido "${tipo}".`)
@@ -173,6 +174,7 @@ function importarItem(crudo, indice) {
       id: nuevoId(),
       texto: texto(op?.texto),
       correcta: Boolean(op?.correcta),
+      feedback: texto(op?.feedback ?? op?.retroalimentacion),
       media: (Array.isArray(op?.media) ? op.media : []).map(mediaImportada),
     }))
     : []

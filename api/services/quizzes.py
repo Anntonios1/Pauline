@@ -32,21 +32,42 @@ ITEM_TYPE_ALIASES = {
 QUIZ_STATES = {"borrador", "publicado", "archivado"}
 MEDIA_TYPES = {"image", "audio", "video", "file"}
 
-# Dominios permitidos para incrustar como iframe en un bloque "info". Whitelist
-# explícita: sin ella, cualquier docente (o una llamada directa a la API que
-# se salte la validación del frontend) podría fijar cualquier URL como src de
-# un iframe que ven los estudiantes — abre la puerta a phishing/clickjacking.
-ALLOWED_EMBED_HOSTS = {"wordwall.net"}
+# Plataformas cuyo iframe de incrustación es de confianza. Se les concede
+# `allow-same-origin` en el reproductor; el resto de dominios no.
+TRUSTED_EMBED_HOSTS = {
+    "wordwall.net", "youtube.com", "youtube-nocookie.com", "youtu.be",
+    "vimeo.com", "player.vimeo.com", "drive.google.com",
+}
+VIDEO_FILE_EXTENSIONS = (".mp4", ".webm", ".ogg", ".ogv", ".m4v", ".mov")
+
+
+def _embed_kind(url: str) -> str:
+    """Clasifica un enlace para decidir CÓMO se incrusta, no SI se incrusta.
+
+    Tres capas, de menos a más riesgo:
+      - "video": apunta a un archivo de video. Se pinta con <video src>, que no
+        ejecuta código del tercero: cualquier dominio es seguro aquí.
+      - "trusted": plataforma conocida, iframe con su URL oficial de embed.
+      - "external": cualquier otra página. Se incrusta en un iframe sin
+        `allow-same-origin`, para que no pueda leer la sesión ni suplantar la
+        app — esto es contenido que ven menores y el enlace lo pega un humano.
+    """
+    parsed = urlparse(url)
+    host = (parsed.hostname or "").lower()
+    ruta = parsed.path.lower()
+    if ruta.endswith(VIDEO_FILE_EXTENSIONS):
+        return "video"
+    if host in TRUSTED_EMBED_HOSTS or any(host.endswith(f".{h}") for h in TRUSTED_EMBED_HOSTS):
+        return "trusted"
+    return "external"
 
 
 def _validate_embed_url(url: str, field: str) -> str:
+    """Exige https. El esquema es lo único innegociable: sin él el contenido
+    viaja en claro y puede ser alterado en tránsito antes de llegar al aula."""
     parsed = urlparse(url)
-    host = (parsed.hostname or "").lower()
-    allowed = host in ALLOWED_EMBED_HOSTS or any(host.endswith(f".{h}") for h in ALLOWED_EMBED_HOSTS)
-    if parsed.scheme != "https" or not allowed:
-        raise QuizValidationError(
-            f"{field} debe ser un enlace https de: {', '.join(sorted(ALLOWED_EMBED_HOSTS))}"
-        )
+    if parsed.scheme != "https" or not parsed.hostname:
+        raise QuizValidationError(f"{field} debe ser un enlace https completo")
     return url
 
 
@@ -240,13 +261,21 @@ def _normalize_item(raw: Any, index: int) -> dict:
         content = _bounded_text(_first(raw, "content", "contenido"), f"{field}.content", maximum=20000)
         if title:
             config.setdefault("title", title)
-        if config.get("wordwall_url"):
-            config["wordwall_url"] = _validate_embed_url(
-                _bounded_text(config["wordwall_url"], f"{field}.config.wordwall_url", required=True, maximum=2048),
-                f"{field}.config.wordwall_url",
+        # `wordwall_url` es el nombre histórico; `embed_url` es el general. Se
+        # aceptan los dos y se guardan los dos, para no romper los quizzes ya
+        # creados ni el frontend que todavía lee el nombre viejo.
+        embed_raw = config.get("embed_url") or config.get("wordwall_url")
+        if embed_raw:
+            campo = f"{field}.config.embed_url"
+            embed_url = _validate_embed_url(
+                _bounded_text(embed_raw, campo, required=True, maximum=2048), campo
             )
+            config["embed_url"] = embed_url
+            config["wordwall_url"] = embed_url
+            # La capa la decide el servidor: el frontend solo la obedece.
+            config["embed_kind"] = _embed_kind(embed_url)
         prompt_source = content or title
-        if not prompt_source and (_first(raw, "media", "medios") or config.get("wordwall_url")):
+        if not prompt_source and (_first(raw, "media", "medios") or embed_raw):
             prompt_source = title or "Juego interactivo"
         prompt = _bounded_text(prompt_source, f"{field}.content", required=True, maximum=20000)
     else:
@@ -367,6 +396,9 @@ def normalize_quiz_payload(payload: Any, *, creating: bool) -> dict:
             raise QuizValidationError("estado debe ser borrador, publicado o archivado")
         result["estado"] = state
 
+    if creating or any(key in payload for key in ("privado", "is_private", "private")):
+        result["privado"] = 1 if bool(_first(payload, "privado", "is_private", "private", default=False)) else 0
+
     if creating or any(key in payload for key in ("items", "preguntas")):
         raw_items = _first(payload, "items", "preguntas", default=[])
         if not isinstance(raw_items, list):
@@ -468,7 +500,7 @@ def _quiz_from_conn(conn: sqlite3.Connection, activity_id: int, *, include_answe
     row = conn.execute(
         """
         SELECT a.*, c.nombre AS categoria_nombre,
-               q.id AS quiz_id, q.version_actual, q.estado AS quiz_estado,
+               q.id AS quiz_id, q.version_actual, q.estado AS quiz_estado, q.privado AS quiz_privado,
                q.configuracion AS quiz_configuracion, q.creado_por AS quiz_creado_por
         FROM actividades a
         JOIN quizzes q ON q.actividad_id = a.id
@@ -586,6 +618,7 @@ def _quiz_from_conn(conn: sqlite3.Connection, activity_id: int, *, include_answe
         "activa": row["activa"],
         "status": row["quiz_estado"],
         "estado": row["quiz_estado"],
+        "privado": bool(row["quiz_privado"]),
         "version": row["version_actual"],
         "quiz_version": row["version_actual"],
         "config": config,
@@ -630,10 +663,10 @@ def crear_quiz(payload: dict, actor_id: int) -> dict:
         activity_id = cursor.lastrowid
         quiz_cursor = conn.execute(
             """
-            INSERT INTO quizzes (actividad_id, version_actual, estado, configuracion, creado_por)
-            VALUES (?, 1, ?, ?, ?)
+            INSERT INTO quizzes (actividad_id, version_actual, estado, privado, configuracion, creado_por)
+            VALUES (?, 1, ?, ?, ?, ?)
             """,
-            (activity_id, data["estado"], _json_dump(data["config"]), actor_id),
+            (activity_id, data["estado"], data["privado"], _json_dump(data["config"]), actor_id),
         )
         quiz_id = quiz_cursor.lastrowid
         _insert_items(conn, quiz_id, actor_id, data["items"])
@@ -692,6 +725,12 @@ def listar_quizzes(*, actor_id=None, is_admin=False, state=None, area=None) -> l
             else:
                 sql += " AND ((q.estado = 'publicado' AND a.activa = 1) OR q.creado_por = ?)"
                 params.append(actor_id)
+        if not is_admin:
+            if actor_id is None:
+                sql += " AND q.privado = 0"
+            else:
+                sql += " AND (q.privado = 0 OR q.creado_por = ?)"
+                params.append(actor_id)
         if area:
             if area not in ALLOWED_AREAS:
                 raise QuizValidationError("Area inválida")
@@ -748,12 +787,13 @@ def actualizar_quiz(activity_id: int, payload: dict, actor_id: int) -> Optional[
             if not count:
                 raise QuizValidationError("Un quiz publicado debe tener al menos un bloque")
         config = data.get("config", _json_load(current["configuracion"], {}))
+        privado = data.get("privado", current["privado"])
         conn.execute(
             """
-            UPDATE quizzes SET version_actual = ?, estado = ?, configuracion = ?,
+            UPDATE quizzes SET version_actual = ?, estado = ?, privado = ?, configuracion = ?,
                                fecha_actualizacion = ? WHERE id = ?
             """,
-            (next_version, state, _json_dump(config), now_utc(), current["id"]),
+            (next_version, state, privado, _json_dump(config), now_utc(), current["id"]),
         )
         if "items" in data:
             conn.execute("DELETE FROM quiz_items WHERE quiz_id = ?", (current["id"],))

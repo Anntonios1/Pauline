@@ -6,11 +6,8 @@ import {
   ChevronRight,
   ChevronUp,
   Clock3,
-  ExternalLink,
-  FileText,
-  Gamepad2,
-  Headphones,
   Info,
+  Paperclip,
   RotateCw,
   Send,
   Trophy,
@@ -27,6 +24,7 @@ import {
   sonidoError,
   sonidoFin,
 } from '../../utils/sound'
+import MediaEngine, { EmbedExterno } from '../../components/media/MediaEngine'
 
 /** Acentos disponibles para personalizar un quiz (coinciden con [data-accent] del CSS). */
 export const TEMAS_QUIZ = ['turquesa', 'violeta', 'azul', 'coral', 'ambar', 'esmeralda']
@@ -239,6 +237,9 @@ function normalizeChoices(rawChoices, itemKey) {
       value,
       text,
       isCorrect: correctness === undefined || correctness === null ? null : parseBoolean(correctness),
+      // Retroalimentación propia de esta opción ("no, la menstruación no es…").
+      // El backend la guarda en quiz_opciones.feedback desde siempre.
+      feedback: String(firstDefined(choice.feedback, choice.retroalimentacion, '')),
       media: normalizeMedia(choice.media, choice.medios, {
         imagen_url: choice.imagen_url,
         image_url: choice.image_url,
@@ -335,7 +336,11 @@ function normalizeItem(rawItem, index, defaultTimer, shuffleOptions = false) {
     }),
     // El bloque no tiene tipo propio en el backend: viaja como 'info' con la
     // URL en configuracion (ver TeacherCreatorPage.jsx: serializeItem).
-    wordwallUrl: typeof itemConfig.wordwall_url === 'string' ? itemConfig.wordwall_url : '',
+    // `wordwall_url` es el nombre histórico; los quizzes viejos solo tienen ese.
+    embedUrl: String(firstDefined(itemConfig.embed_url, itemConfig.wordwall_url, '')),
+    // Cómo incrustarlo lo decide el backend (_embed_kind). Un quiz creado antes
+    // de que existiera el campo solo puede ser de Wordwall, que es de confianza.
+    embedKind: String(firstDefined(itemConfig.embed_kind, 'trusted')),
     // Modos "ordenar" y "emparejar": viajan como short_text con la definición
     // en configuracion, igual que wordwall. Así no hay que ampliar el CHECK de
     // quiz_items.tipo, que en SQLite obliga a reconstruir la tabla.
@@ -549,126 +554,7 @@ function formatDuration(durationMs) {
   return minutes > 0 ? `${minutes} min ${seconds} s` : `${seconds} s`
 }
 
-function mediaFileName(entry) {
-  if (entry.title) return entry.title
-  try {
-    const pathname = new URL(entry.url, 'http://local').pathname
-    return decodeURIComponent(pathname.split('/').filter(Boolean).pop() || 'Archivo adjunto')
-  } catch {
-    return 'Archivo adjunto'
-  }
-}
 
-/** Solo se llega aquí con una URL ya validada por el backend (dominio wordwall.net, https). */
-function WordwallEmbed({ url }) {
-  if (!url) return null
-  return (
-    <div className="a-fade-up my-5 overflow-hidden rounded-2xl border" style={{ borderColor: 'var(--ar-border)' }}>
-      <div className="relative w-full" style={{ paddingBottom: '75%' }}>
-        <iframe
-          src={url}
-          title="Juego interactivo de Wordwall"
-          className="absolute inset-0 h-full w-full"
-          sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
-          loading="lazy"
-          allowFullScreen
-        />
-      </div>
-      <div
-        className="flex items-center justify-between gap-2 border-t px-3 py-2 text-xs"
-        style={{ borderColor: 'var(--ar-border)', background: 'var(--ar-surface-2)' }}
-      >
-        <span className="flex items-center gap-1.5 font-bold text-[color:var(--ar-muted)]">
-          <Gamepad2 size={14} /> Juego de Wordwall
-        </span>
-        <a
-          href={url}
-          target="_blank"
-          rel="noreferrer"
-          className="inline-flex items-center gap-1 font-bold text-[color:var(--ar-primary)] hover:underline"
-        >
-          Abrir en pestaña nueva <ExternalLink size={13} />
-        </a>
-      </div>
-    </div>
-  )
-}
-
-function MediaGallery({ media, compact = false }) {
-  if (!media?.length) return null
-
-  return (
-    <div className={`grid gap-3 ${compact ? 'mt-3' : 'my-5'} ${media.filter(entry => entry.kind === 'image').length > 1 ? 'sm:grid-cols-2' : ''}`}>
-      {media.map((entry, index) => (
-        entry.kind === 'audio' ? (
-          /* El audio se destaca: en primaria muchas consignas se escuchan
-             antes de leerse, así que no puede pasar como un adjunto más. */
-          <div
-            key={`${entry.url}-${index}`}
-            className="a-fade-up rounded-2xl border p-4 sm:col-span-2"
-            style={{ borderColor: 'var(--ar-primary)', background: 'var(--ar-primary-light)' }}
-          >
-            <div className="mb-2.5 flex items-center gap-2">
-              <span
-                className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-white"
-                style={{ background: 'var(--ar-primary)' }}
-              >
-                <Headphones size={18} />
-              </span>
-              <div className="min-w-0">
-                <p className="text-sm font-extrabold" style={{ color: 'var(--ar-primary-dark)' }}>
-                  {entry.title || 'Escucha este audio'}
-                </p>
-                <p className="text-xs text-[color:var(--ar-muted)]">Puedes reproducirlo las veces que necesites.</p>
-              </div>
-            </div>
-            <audio controls preload="metadata" className="w-full" src={entry.url}>
-              Tu navegador no puede reproducir este audio.
-            </audio>
-          </div>
-        ) : entry.kind === 'video' ? (
-          <div key={`${entry.url}-${index}`} className="rounded-xl border border-slate-200 bg-slate-50 p-3 sm:col-span-2">
-            {entry.title && <p className="mb-2 text-sm font-medium text-slate-700">{entry.title}</p>}
-            <video controls preload="metadata" className="w-full rounded-lg" src={entry.url}>
-              Tu navegador no puede reproducir este video.
-            </video>
-          </div>
-        ) : entry.kind === 'file' ? (
-          <div key={`${entry.url}-${index}`} className="flex flex-wrap items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 sm:col-span-2">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-indigo-100 text-indigo-700">
-              <FileText size={21} />
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold text-slate-800">{mediaFileName(entry)}</p>
-              <p className="text-xs text-slate-500">Archivo adjunto</p>
-            </div>
-            <a
-              href={entry.url}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-bold text-white hover:bg-indigo-700"
-            >
-              Abrir <ExternalLink size={14} />
-            </a>
-            <a href={entry.url} download className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100">
-              Descargar
-            </a>
-          </div>
-        ) : (
-          <figure key={`${entry.url}-${index}`} className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
-            <img
-              src={entry.url}
-              alt={entry.alt || entry.title || 'Imagen del bloque'}
-              className={`${compact ? 'max-h-36' : 'max-h-80'} w-full object-contain`}
-              loading="lazy"
-            />
-            {entry.title && <figcaption className="border-t border-slate-200 px-3 py-2 text-xs text-slate-600">{entry.title}</figcaption>}
-          </figure>
-        )
-      ))}
-    </div>
-  )
-}
 
 function ChoiceButton({ choice, selected, submitted, correct, revealEvaluation, onClick, multiple }) {
   let stateClass = 'border-slate-200 bg-white hover:border-teal-300 hover:bg-teal-50/50'
@@ -693,7 +579,7 @@ function ChoiceButton({ choice, selected, submitted, correct, revealEvaluation, 
         </span>
         <div className="min-w-0 flex-1">
           <span className="font-semibold">{choice.text}</span>
-          <MediaGallery media={choice.media} compact />
+          <MediaEngine media={choice.media} compact />
         </div>
         {submitted && revealEvaluation && correct === true && <CheckCircle2 size={20} className="shrink-0 text-emerald-600" />}
         {submitted && revealEvaluation && selected && correct === false && <XCircle size={20} className="shrink-0 text-rose-600" />}
@@ -885,7 +771,56 @@ function Ficha3D({ frente, reverso, flipped, onFlip }) {
   )
 }
 
-function Feedback({ record, explanation }) {
+/* La respuesta esperada, lista para mostrar. En opción única/múltiple y en
+   verdadero/falso el estudiante ya la ve resaltada en verde, pero en respuesta
+   corta, ordenar y emparejar no había ningún resaltado: fallaba y nunca se
+   enteraba de cuál era. Devuelve null cuando no hay nada que revelar. */
+function respuestaEsperada(item) {
+  if (!item) return null
+
+  if (item.mode === 'ordenar') {
+    const piezas = String(firstDefined(item.correctAnswer, '')).split(' | ').filter(Boolean)
+    if (piezas.length === 0) return null
+    return (
+      <ol className="mt-1 list-inside list-decimal space-y-0.5">
+        {piezas.map((pieza, i) => <li key={`${pieza}-${i}`}>{pieza}</li>)}
+      </ol>
+    )
+  }
+
+  if (item.mode === 'emparejar') {
+    const pares = String(firstDefined(item.correctAnswer, '')).split(' | ').filter(Boolean)
+    if (pares.length === 0) return null
+    return (
+      <ul className="mt-1 space-y-0.5">
+        {pares.map((par, i) => {
+          const [izq, der] = par.split(' = ')
+          return <li key={`${par}-${i}`}><strong>{izq}</strong> → {der}</li>
+        })}
+      </ul>
+    )
+  }
+
+  if (item.type === 'short_text') {
+    const valores = (Array.isArray(item.correctAnswer) ? item.correctAnswer : [item.correctAnswer])
+      .filter(hasMeaningfulValue)
+      .map(String)
+    if (valores.length === 0) return null
+    // Si el docente aceptó varias formas, se muestran todas: enseña más que una.
+    return <p className="mt-1 font-bold">{valores.join('  ·  ')}</p>
+  }
+
+  if (item.type === 'true_false') {
+    const valor = parseBoolean(item.correctAnswer)
+    if (valor === null) return null
+    return <p className="mt-1 font-bold">{valor ? 'Verdadero' : 'Falso'}</p>
+  }
+
+  // Las de opciones ya quedan resaltadas sobre los propios botones.
+  return null
+}
+
+function Feedback({ record, explanation, item, optionFeedback }) {
   if (!record) return null
 
   const state = record.timed_out
@@ -896,12 +831,30 @@ function Feedback({ record, explanation }) {
         ? { title: 'Respuesta incorrecta', className: 'border-rose-200 bg-rose-50 text-rose-950', icon: <XCircle size={21} /> }
         : { title: 'Respuesta registrada', className: 'border-blue-200 bg-blue-50 text-blue-950', icon: <Info size={21} /> }
 
+  // Solo se revela al fallar o al quedarse sin tiempo: si acertó, decírselo
+  // sobraría, y en un quiz con varios intentos no conviene regalarla.
+  const fallo = record.is_correct === false || record.timed_out
+  const esperada = fallo ? respuestaEsperada(item) : null
+
   return (
     <div role="status" className={`mt-6 rounded-2xl border p-4 ${state.className}`}>
       <div className="flex items-center gap-2 font-bold">
         {state.icon}
         <span>{state.title}</span>
       </div>
+
+      {esperada && (
+        <div className="mt-3 rounded-xl bg-white/70 p-3 text-sm text-slate-800">
+          <p className="text-xs font-black uppercase tracking-wide text-slate-500">
+            Respuesta correcta
+          </p>
+          {esperada}
+        </div>
+      )}
+
+      {optionFeedback && (
+        <p className="mt-2 text-sm leading-relaxed text-slate-700">{optionFeedback}</p>
+      )}
       {explanation && <p className="mt-2 text-sm leading-relaxed text-slate-700">{explanation}</p>}
     </div>
   )
@@ -1009,13 +962,30 @@ export default function UnifiedQuiz({ activity, questions, items, onComplete }) 
     () => (shuffleQuestions ? shuffleQuestionSlots(normalizedSourceItems) : normalizedSourceItems),
     [normalizedSourceItems, shuffleQuestions],
   )
+  /* Materiales que valen para todo el quiz, no para un bloque: el audio de la
+     consigna general, el PDF de apoyo, los recursos de la biblioteca. El
+     backend los guardaba desde siempre (quiz.media sin item_id, y
+     actividad.recursos), pero no había dónde mostrarlos y quedaban invisibles.
+     La portada se excluye: ya se ve en la tarjeta que abrió esta actividad. */
+  const materialesDelQuiz = useMemo(() => {
+    const portada = firstDefined(config?.feed_card?.cover_url, config?.feed_card?.imagen, '')
+    const recursos = (Array.isArray(activity?.recursos) ? activity.recursos : [])
+      .map(recurso => ({ url: recurso.archivo_o_url, title: recurso.titulo, tipo: recurso.tipo }))
+    return normalizeMedia(activity?.media, activity?.medios, recursos)
+      .filter(entry => entry.url !== portada)
+  }, [activity, config])
   const quizIdentity = `${firstDefined(activity?.id, activity?.quiz_id, 'quiz')}:${normalizedItems.map(item => item.key).join('|')}`
 
   const [currentIndex, setCurrentIndex] = useState(0)
   const [records, setRecords] = useState({})
   const [draft, setDraft] = useState(() => defaultDraft(normalizedItems[0]?.type))
   const [flipped, setFlipped] = useState(false)
-  const [timeLeft, setTimeLeft] = useState(normalizedItems[0]?.timerSeconds || 0)
+  // El contador guarda a qué bloque pertenece, no solo cuánto queda. Si fueran
+  // dos estados separados, al cambiar de bloque el efecto de auto-envío leería
+  // el `left` del bloque anterior (un 0 recién expirado) mientras `current` ya
+  // es el nuevo, y lo daría por fallado sin dejar responder. Yendo juntos en un
+  // solo objeto, el valor y su dueño nunca se desincronizan.
+  const [timer, setTimer] = useState({ key: normalizedItems[0]?.key ?? null, left: normalizedItems[0]?.timerSeconds || 0 })
   const [globalTimeLeft, setGlobalTimeLeft] = useState(globalTimer)
   const [result, setResult] = useState(null)
   const [isCompleting, setIsCompleting] = useState(false)
@@ -1026,13 +996,16 @@ export default function UnifiedQuiz({ activity, questions, items, onComplete }) 
   const current = normalizedItems[currentIndex]
   const currentRecord = current ? records[current.key] : null
   const isQuestion = current ? QUESTION_TYPES.has(current.type) : false
+  // Si el contador todavía es el del bloque anterior, vale el tiempo completo
+  // de este: nunca un 0 heredado.
+  const timeLeft = timer.key === current?.key ? timer.left : (current?.timerSeconds || 0)
 
   useEffect(() => {
     setCurrentIndex(0)
     setRecords({})
     setDraft(defaultDraft(normalizedItems[0]?.type))
     setFlipped(false)
-    setTimeLeft(normalizedItems[0]?.timerSeconds || 0)
+    setTimer({ key: normalizedItems[0]?.key ?? null, left: normalizedItems[0]?.timerSeconds || 0 })
     setGlobalTimeLeft(globalTimer)
     setResult(null)
     setCompletionError('')
@@ -1059,7 +1032,7 @@ export default function UnifiedQuiz({ activity, questions, items, onComplete }) 
     const saved = records[current.key]
     setDraft(saved ? saved.draft : defaultDraft(current.type))
     setFlipped(Boolean(saved?.revealed))
-    setTimeLeft(saved ? 0 : current.timerSeconds)
+    setTimer({ key: current.key, left: saved ? 0 : current.timerSeconds })
     itemStartedAtRef.current = performance.now()
   }, [current?.key]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1198,16 +1171,20 @@ export default function UnifiedQuiz({ activity, questions, items, onComplete }) 
 
   useEffect(() => {
     if (!current || !isQuestion || currentRecord || !current.timerSeconds || result) return undefined
-    const timer = window.setInterval(() => {
-      setTimeLeft(value => Math.max(0, value - 1))
+    const intervalo = window.setInterval(() => {
+      // Solo descuenta si el contador sigue siendo el de este bloque.
+      setTimer(actual => (actual.key === current.key
+        ? { ...actual, left: Math.max(0, actual.left - 1) }
+        : actual))
     }, 1000)
-    return () => window.clearInterval(timer)
+    return () => window.clearInterval(intervalo)
   }, [current?.key, current?.timerSeconds, currentRecord, isQuestion, result])
 
   useEffect(() => {
-    if (current?.timerSeconds && isQuestion && timeLeft === 0 && !currentRecord && !result) {
-      submitQuestion(true)
-    }
+    // `timeLeft` ya sale de comparar timer.key con el bloque actual, así que un
+    // 0 heredado del bloque anterior no llega hasta aquí.
+    if (!current?.timerSeconds || !isQuestion || timeLeft !== 0 || currentRecord || result) return
+    submitQuestion(true)
   }, [timeLeft, current, currentRecord, isQuestion, result, submitQuestion])
 
   useEffect(() => {
@@ -1369,6 +1346,14 @@ export default function UnifiedQuiz({ activity, questions, items, onComplete }) 
   const progress = ((currentIndex + 1) / normalizedItems.length) * 100
   const correctKeys = current ? getCorrectChoiceKeys(current) : []
   const activeDraft = currentRecord ? currentRecord.draft : draft
+  // Retroalimentación que el docente escribió para la(s) opción(es) marcadas.
+  const feedbackDeOpcionesElegidas = currentRecord && current
+    ? current.choices
+      .filter(choice => (Array.isArray(activeDraft) ? activeDraft.includes(choice.key) : activeDraft === choice.key))
+      .map(choice => choice.feedback)
+      .filter(Boolean)
+      .join(' ')
+    : ''
 
   return (
     /* data-accent tiñe todo el subárbol: el acento elegido por quien creó el
@@ -1429,6 +1414,25 @@ export default function UnifiedQuiz({ activity, questions, items, onComplete }) 
         )}
       </header>
 
+      {materialesDelQuiz.length > 0 && (
+        <details
+          open={currentIndex === 0}
+          className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:px-6"
+        >
+          <summary className="flex cursor-pointer items-center gap-2 text-sm font-extrabold text-slate-700">
+            <Paperclip size={16} className="text-[color:var(--ar-primary)]" />
+            Material de apoyo del quiz
+            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-500">
+              {materialesDelQuiz.length}
+            </span>
+          </summary>
+          <p className="mt-1 text-xs text-[color:var(--ar-muted)]">
+            Puedes consultarlo en cualquier momento, sin salir del quiz.
+          </p>
+          <MediaEngine media={materialesDelQuiz} />
+        </details>
+      )}
+
       <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-lg sm:p-8">
         {current.type === 'unsupported' && (
           <div className="mb-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
@@ -1445,8 +1449,8 @@ export default function UnifiedQuiz({ activity, questions, items, onComplete }) 
           <p className="mt-3 whitespace-pre-wrap leading-relaxed text-slate-700">{current.content}</p>
         )}
 
-        <WordwallEmbed url={current.wordwallUrl} />
-        <MediaGallery media={current.media} />
+        <EmbedExterno url={current.embedUrl} kind={current.embedKind} titulo={current.prompt} />
+        <MediaEngine media={current.media} />
 
         {(current.type === 'single_choice' || current.type === 'multiple_choice') && (
           <div className="mt-6 grid gap-3 sm:grid-cols-2">
@@ -1553,7 +1557,14 @@ export default function UnifiedQuiz({ activity, questions, items, onComplete }) 
           />
         )}
 
-        {showFeedback && <Feedback record={currentRecord} explanation={current.explanation} />}
+        {showFeedback && (
+          <Feedback
+            record={currentRecord}
+            explanation={current.explanation}
+            item={current}
+            optionFeedback={feedbackDeOpcionesElegidas}
+          />
+        )}
 
         <div className="mt-7 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-5">
           <button

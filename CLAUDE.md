@@ -32,10 +32,12 @@ python api/tests/test_api.py
 python api/tests/test_unified_quizzes.py
 python api/tests/test_extended_audit.py
 python api/tests/test_security_regressions.py
+python api/tests/test_media_streaming.py
 python api/tests/test_live.py
 ```
 
-`test_unified_quizzes.py`, `test_security_regressions.py` y `test_avatar_encryption.py` son
+`test_unified_quizzes.py`, `test_security_regressions.py`, `test_media_streaming.py` y
+`test_avatar_encryption.py` son
 `unittest` (DB temporal por test, llamadas directas a los handlers, sin servidor HTTP); los
 demás levantan uvicorn. `test_security_regressions.py` cubre control de acceso: escalada de
 rol, solucionario legacy oculto al estudiante, borradores ajenos y endpoints que exigen staff.
@@ -44,6 +46,9 @@ rol, solucionario legacy oculto al estudiante, borradores ajenos y endpoints que
 (`api/utils/upload.py: encrypt_and_save_avatar`/`decrypt_avatar`, extensión `.avatarenc`) y se
 descifra solo al servirla por `/uploads/`; aísla `UPLOAD_DIR` con `unittest.mock.patch` porque,
 a diferencia de `DB_PATH`, no es configurable por variable de entorno.
+`test_media_streaming.py` cubre el parser de `Range` (`api/utils/upload.py: _parse_range` /
+`open_upload_stream`) y la clasificación de enlaces incrustables
+(`api/services/quizzes.py: _embed_kind`); parchea `UPLOAD_DIR` igual que el de avatares.
 There is no single-test-function runner — each file's `main()` runs a fixed sequence of assertions end-to-end; read the file to run only part of it.
 
 ### Frontend (`frontend/`)
@@ -77,10 +82,14 @@ Nothing imports it, so it never reaches the bundle.
 - Real-time quiz games run over a WebSocket at `/ws/room/{room_code}`, handled entirely by `api/websocket/room_manager.py` (`RoomManager`/`RoomState`/`PlayerState`) — join/start/answer/next/end message protocol documented in that file's docstring and mirrored in `app.py`'s websocket route docstring. This is unrelated to the REST `routes_registry` dispatch path.
 - Config/constants (allowed areas, publication states, difficulties, moderation decisions, upload MIME allow-lists, rate limiting) live in `api/config/settings.py` — check there before hardcoding a valid-values list elsewhere. Only lists with a real reader live there; roles/question-types/attempt-states are validated inline where they're used.
 - Quiz content has two generations: legacy `preguntas`/`intentos` tables and a newer unified engine (`quizzes`, `quiz_items`, `quiz_opciones`, `quiz_media_assets`, `quiz_versions`, `quiz_respuestas_intento`) — `database/reset_legacy_quizzes.py` and `services/quizzes.py` relate to the migration between them.
+- `/uploads/` se sirve por bloques con soporte de `Range` (`open_upload_stream` en `api/utils/upload.py`, respuesta `206` en `app.py`). No lo cambies a leer el archivo entero: el seek de `<video>` depende de las respuestas parciales, y sin ellas un archivo de 100 MB se carga completo en RAM por petición. Esa ruta también responde `X-Frame-Options: SAMEORIGIN` en lugar del `DENY` global, porque el visor de PDF incrusta `/uploads/` en un `<iframe>` de la propia app.
+- Los enlaces incrustables no tienen whitelist de dominios: `_embed_kind` (`services/quizzes.py`) los clasifica en `video` (archivo de video → `<video>`, sin iframe), `trusted` (Wordwall/YouTube/Vimeo/Drive → iframe con `allow-same-origin`) y `external` (cualquier otra página → iframe **sin** `allow-same-origin`). Lo único obligatorio es `https`. La capa se calcula en el servidor y viaja en `config.embed_kind`; el frontend la obedece. `config.wordwall_url` se sigue escribiendo junto a `embed_url` por compatibilidad con los quizzes ya creados.
 
 ### Frontend: role-based routing over two layouts, contexts for state
 - `App.jsx` defines two parallel route trees under one `<Routes>`: student routes at `/` (`StudentLayout`) and teacher/admin routes at `/admin` (`TeacherLayout`), each gated by `ProtectedRoute` (optionally with `allowedRoles`). Many page components (e.g. `PublicationsPage`, `ActivitiesPage`) are reused verbatim under both trees.
 - Global state is via React Context, not a store library: `AuthContext` (token + user in `localStorage`, exposes `login`/`logout`/`updateUser`), `DataContext` (categories/publications/activities/resources/progress, plus a moderation queue populated only for `docente`/`administrador` roles), `WebSocketContext` (live game connection).
 - All backend calls go through `frontend/src/services/api.js` — a single `fetchWithAuth` wrapper (attaches bearer token from `localStorage`, prefixes `/api`, throws on non-OK responses) with one exported function per endpoint. Add new endpoints here rather than calling `fetch` directly from components.
 - The live quiz/game UI is `frontend/src/engines/UnifiedQuiz/` and `frontend/src/engines/GameEngine.jsx`, driven by the `/ws/room/:code` protocol via `WebSocketContext`.
+- Todo lo que pinte medios (imagen/audio/video/PDF/incrustaciones) pasa por `frontend/src/components/media/MediaEngine.jsx`, usado tanto por el reproductor como por la vista previa del creador. Añade tipos ahí, no en cada pantalla.
+- En `UnifiedQuiz.jsx` el contador de tiempo es un solo estado `{ key, left }` a propósito: con dos estados separados, al cambiar de bloque el efecto de auto-envío leía el `left` del bloque anterior (un 0 recién expirado) mientras `current` ya era el nuevo, y lo daba por fallado sin dejar responder. Si lo tocas, mantén el valor y su bloque juntos.
 - Dev server (`vite.config.js`) proxies `/api`, `/uploads`, and `/ws` to `http://127.0.0.1:8000` and logs every proxied request/response to the console — the backend must be running for frontend dev to do anything beyond static routing.

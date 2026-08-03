@@ -37,7 +37,7 @@ def crear_actividad(actividad: Actividad) -> dict:
         close_db(conn)
 
 
-def listar_actividades(area: str = None, dificultad: str = None, activas: bool = True, creado_por: int = None, q: str = None) -> list:
+def listar_actividades(area: str = None, dificultad: str = None, activas: bool = True, creado_por: int = None, q: str = None, viewer_id: int = None, is_admin: bool = False) -> list:
     conn = get_db()
     try:
         query = """
@@ -46,6 +46,8 @@ def listar_actividades(area: str = None, dificultad: str = None, activas: bool =
                    COUNT(DISTINCT CASE WHEN qi.tipo IN ('single_choice','multiple_choice','true_false') THEN qi.id END) AS live_questions_count,
                    CASE WHEN q.id IS NULL THEN 0 ELSE 1 END as quiz_unificado,
                    q.version_actual as quiz_version,
+                   q.estado as quiz_estado,
+                   q.privado as quiz_privado,
                    q.configuracion as quiz_configuracion,
                    (SELECT qm.url FROM quiz_media_assets qm
                     WHERE qm.quiz_id = q.id AND qm.tipo = 'image'
@@ -74,6 +76,12 @@ def listar_actividades(area: str = None, dificultad: str = None, activas: bool =
             condiciones.append("(a.titulo LIKE ? ESCAPE '\\' OR a.descripcion LIKE ? ESCAPE '\\')")
             termino = sql_like_term(q)
             params.extend([termino, termino])
+        if not is_admin:
+            if viewer_id is not None:
+                condiciones.append("(q.privado IS NULL OR q.privado = 0 OR q.creado_por = ?)")
+                params.append(viewer_id)
+            else:
+                condiciones.append("(q.privado IS NULL OR q.privado = 0)")
         if condiciones:
             query += " WHERE " + " AND ".join(condiciones)
         query += " GROUP BY a.id"

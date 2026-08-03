@@ -14,13 +14,13 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from api.routes import routes_registry
 from api.database.connection import init_db
 from api.services.sessions import limpiar_sesiones_expiradas
-from api.utils.upload import serve_upload
+from api.utils.upload import open_upload_stream
 from api.websocket.room_manager import room_manager
 
 
@@ -98,12 +98,32 @@ async def dispatch(request: Request) -> Response:
     path = request.url.path
     method = request.method.upper()
 
-    # Servir archivos subidos
+    # Servir archivos subidos. Se transmite por bloques y se respeta `Range`
+    # para que un video se pueda adelantar sin descargarlo entero.
     if path.startswith("/uploads/"):
-        data, mime = serve_upload(path)
-        if data is None:
+        stream = open_upload_stream(path, request.headers.get("range"))
+        if stream is None:
             return JSONResponse({"error": "Archivo no encontrado"}, status_code=404)
-        return Response(content=data, media_type=mime)
+        bloques, mime, size, inicio, fin = stream
+        parcial = (inicio, fin) != (0, max(0, size - 1))
+        headers = {
+            **SECURITY_HEADERS,
+            # El visor de PDF incrusta /uploads/ en un <iframe> de la propia app:
+            # con DENY el navegador lo bloquea aunque sea el mismo origen. Se
+            # permite solo mismo origen — un sitio externo sigue sin poder
+            # enmarcar estos archivos.
+            "X-Frame-Options": "SAMEORIGIN",
+            "Accept-Ranges": "bytes",
+            "Content-Length": str(fin - inicio + 1),
+        }
+        if parcial:
+            headers["Content-Range"] = f"bytes {inicio}-{fin}/{size}"
+        return StreamingResponse(
+            bloques,
+            status_code=206 if parcial else 200,
+            media_type=mime,
+            headers=headers,
+        )
 
     # Leer body
     body_bytes = b""
