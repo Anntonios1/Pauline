@@ -1,0 +1,994 @@
+/* Google Fonts — debe ir ANTES de @tailwind */
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ==================================================================
+   AULARED — SISTEMA DE DISEÑO (MONOLITO)
+
+   Todo el sistema visual vive en este archivo a propósito: un solo
+   sitio que tocar para cambiar colores, temas, animaciones o formas.
+
+   ÍNDICE
+     01. TOKENS            — colores, sombras, radios, motion
+     02. TEMAS             — claro / oscuro  ([data-theme])
+     03. ACENTOS           — paletas de color ([data-accent])
+     04. BASE              — html, body, tipografía
+     05. MOTION            — keyframes y utilidades de animación
+     06. SKELETONS         — carga dinámica con forma de contenido
+     07. COMPONENTES       — botones, cards, nav, inputs…
+     08. PUBLICACIONES     — personalización visual por publicación
+     09. UTILIDADES        — layout, line-clamp, accesibilidad
+   ================================================================== */
+
+
+/* ==================================================================
+   01. TOKENS
+   ================================================================== */
+:root {
+  /* --- Acento activo (lo sobrescribe [data-accent], ver sección 03) --- */
+  --ar-primary:       #0ea5a5;
+  --ar-primary-dark:  #0d8a8a;
+  --ar-primary-light: #e0f7f7;
+  --ar-primary-rgb:   14, 165, 165;
+
+  /* --- Materias --- */
+  --ar-math:          #3b82f6;   /* Azul   — Matemáticas */
+  --ar-science:       #22c55e;   /* Verde  — Ciencias */
+  --ar-activity:      #f97316;   /* Naranja— Actividades */
+  --ar-student-pub:   #8b5cf6;   /* Morado — Publicaciones estudiante */
+  --ar-warning:       #eab308;   /* Amarillo — Alertas */
+
+  /* --- Roles --- */
+  --ar-teacher:       #7c3aed;
+  --ar-admin:         #1e3a5f;
+
+  /* --- Superficies --- */
+  --ar-bg:            #f0f4f8;
+  --ar-bg-alt:        #e8eef5;
+  --ar-surface:       #ffffff;
+  --ar-surface-2:     #f8fafc;
+  --ar-surface-sunken: #f1f5f9;
+  --ar-border:        #e2e8f0;
+  --ar-border-strong: #cbd5e1;
+
+  /* --- Texto --- */
+  --ar-text:          #1e293b;
+  --ar-text-strong:   #0f172a;
+  --ar-muted:         #64748b;
+  --ar-subtle:        #94a3b8;
+
+  /* --- Sombras --- */
+  --ar-shadow-sm:     0 1px 3px rgba(15, 23, 42, 0.08);
+  --ar-shadow-md:     0 4px 12px rgba(15, 23, 42, 0.10);
+  --ar-shadow-lg:     0 8px 24px rgba(15, 23, 42, 0.12);
+  --ar-shadow-xl:     0 18px 44px rgba(15, 23, 42, 0.16);
+  --ar-ring:          0 0 0 3px rgba(var(--ar-primary-rgb), 0.18);
+
+  /* --- Radios --- */
+  --ar-radius-sm:     10px;
+  --ar-radius-md:     16px;
+  --ar-radius-lg:     24px;
+  --ar-radius-xl:     32px;
+  --ar-radius-full:   9999px;
+
+  /* --- Motion: curvas --- */
+  --ar-ease:          cubic-bezier(0.4, 0, 0.2, 1);      /* estándar */
+  --ar-ease-out:      cubic-bezier(0.16, 1, 0.3, 1);     /* salida amplia, moderna */
+  --ar-ease-spring:   cubic-bezier(0.34, 1.56, 0.64, 1); /* rebote suave */
+  --ar-ease-snap:     cubic-bezier(0.2, 0.9, 0.3, 1.2);  /* micro-interacción */
+
+  /* --- Motion: duraciones --- */
+  --ar-dur-fast:      140ms;
+  --ar-dur-base:      240ms;
+  --ar-dur-slow:      420ms;
+  --ar-dur-slower:    640ms;
+
+  /* --- Skeletons --- */
+  --ar-skeleton-base:  #e6ecf3;
+  --ar-skeleton-shine: rgba(255, 255, 255, 0.85);
+}
+
+
+/* ==================================================================
+   02. TEMAS
+   El toggle escribe data-theme="oscuro" en <html> (ver ThemeContext).
+
+   Nota: muchas pantallas usan utilidades de Tailwind directas
+   (bg-white, text-slate-900…). En vez de tocar 40 archivos, el tema
+   oscuro las reasigna aquí — así el monolito sigue siendo el único
+   sitio a editar.
+   ================================================================== */
+[data-theme='oscuro'] {
+  --ar-bg:            #0b1220;
+  --ar-bg-alt:        #0f172a;
+  --ar-surface:       #131c2e;
+  --ar-surface-2:     #1a2438;
+  --ar-surface-sunken: #0f172a;
+  --ar-border:        #24314a;
+  --ar-border-strong: #33415c;
+
+  --ar-text:          #e6edf7;
+  --ar-text-strong:   #f8fafc;
+  --ar-muted:         #9aa9bf;
+  --ar-subtle:        #7d8ca4;
+
+  --ar-primary-light: rgba(var(--ar-primary-rgb), 0.16);
+  --ar-admin:         #16233b;
+
+  --ar-shadow-sm:     0 1px 3px rgba(0, 0, 0, 0.45);
+  --ar-shadow-md:     0 4px 14px rgba(0, 0, 0, 0.5);
+  --ar-shadow-lg:     0 10px 28px rgba(0, 0, 0, 0.55);
+  --ar-shadow-xl:     0 20px 48px rgba(0, 0, 0, 0.6);
+
+  --ar-skeleton-base:  #1d2739;
+  --ar-skeleton-shine: rgba(255, 255, 255, 0.07);
+
+  color-scheme: dark;
+}
+
+/* --- Reasignación de utilidades Tailwind en oscuro --- */
+[data-theme='oscuro'] .bg-white          { background-color: var(--ar-surface) !important; }
+[data-theme='oscuro'] .bg-slate-50       { background-color: var(--ar-surface-2) !important; }
+[data-theme='oscuro'] .bg-slate-50\/80   { background-color: var(--ar-surface-2) !important; }
+[data-theme='oscuro'] .bg-slate-100      { background-color: var(--ar-surface-2) !important; }
+[data-theme='oscuro'] .bg-slate-200      { background-color: var(--ar-border) !important; }
+
+[data-theme='oscuro'] .text-slate-900    { color: var(--ar-text-strong) !important; }
+[data-theme='oscuro'] .text-slate-800    { color: var(--ar-text) !important; }
+[data-theme='oscuro'] .text-slate-700    { color: var(--ar-text) !important; }
+[data-theme='oscuro'] .text-slate-600    { color: var(--ar-muted) !important; }
+[data-theme='oscuro'] .text-slate-500    { color: var(--ar-muted) !important; }
+[data-theme='oscuro'] .text-slate-400    { color: var(--ar-subtle) !important; }
+
+[data-theme='oscuro'] .border-slate-100  { border-color: var(--ar-border) !important; }
+[data-theme='oscuro'] .border-slate-200  { border-color: var(--ar-border) !important; }
+[data-theme='oscuro'] .border-slate-300  { border-color: var(--ar-border-strong) !important; }
+[data-theme='oscuro'] .divide-slate-50 > * + * { border-color: var(--ar-border) !important; }
+[data-theme='oscuro'] .divide-slate-100 > * + * { border-color: var(--ar-border) !important; }
+[data-theme='oscuro'] .ring-slate-100    { --tw-ring-color: var(--ar-border) !important; }
+
+/* Tintes suaves: en oscuro se vuelven translúcidos en vez de pasteles */
+[data-theme='oscuro'] .bg-teal-50,
+[data-theme='oscuro'] .bg-teal-100       { background-color: rgba(20, 184, 166, 0.16) !important; }
+[data-theme='oscuro'] .bg-violet-50,
+[data-theme='oscuro'] .bg-purple-50,
+[data-theme='oscuro'] .bg-purple-100     { background-color: rgba(139, 92, 246, 0.18) !important; }
+[data-theme='oscuro'] .bg-blue-50,
+[data-theme='oscuro'] .bg-blue-100       { background-color: rgba(59, 130, 246, 0.18) !important; }
+[data-theme='oscuro'] .bg-orange-50,
+[data-theme='oscuro'] .bg-orange-100     { background-color: rgba(249, 115, 22, 0.18) !important; }
+[data-theme='oscuro'] .bg-amber-50       { background-color: rgba(245, 158, 11, 0.16) !important; }
+[data-theme='oscuro'] .bg-green-50,
+[data-theme='oscuro'] .bg-green-100,
+[data-theme='oscuro'] .bg-emerald-50     { background-color: rgba(34, 197, 94, 0.16) !important; }
+[data-theme='oscuro'] .bg-red-50,
+[data-theme='oscuro'] .bg-red-100        { background-color: rgba(239, 68, 68, 0.16) !important; }
+[data-theme='oscuro'] .bg-yellow-100     { background-color: rgba(234, 179, 8, 0.18) !important; }
+[data-theme='oscuro'] .bg-pink-100       { background-color: rgba(236, 72, 153, 0.18) !important; }
+[data-theme='oscuro'] .bg-sky-100        { background-color: rgba(14, 165, 233, 0.18) !important; }
+
+/* Texto sobre tintes: sube luminosidad para mantener contraste */
+[data-theme='oscuro'] .text-teal-700,
+[data-theme='oscuro'] .text-teal-600     { color: #5eead4 !important; }
+[data-theme='oscuro'] .text-purple-700,
+[data-theme='oscuro'] .text-purple-600,
+[data-theme='oscuro'] .text-violet-700   { color: #c4b5fd !important; }
+[data-theme='oscuro'] .text-blue-700,
+[data-theme='oscuro'] .text-blue-800     { color: #93c5fd !important; }
+[data-theme='oscuro'] .text-orange-700,
+[data-theme='oscuro'] .text-orange-800,
+[data-theme='oscuro'] .text-orange-600   { color: #fdba74 !important; }
+[data-theme='oscuro'] .text-green-700,
+[data-theme='oscuro'] .text-green-800,
+[data-theme='oscuro'] .text-green-600    { color: #86efac !important; }
+[data-theme='oscuro'] .text-red-700,
+[data-theme='oscuro'] .text-red-800,
+[data-theme='oscuro'] .text-red-600      { color: #fca5a5 !important; }
+[data-theme='oscuro'] .text-yellow-800   { color: #fde047 !important; }
+[data-theme='oscuro'] .text-amber-800    { color: #fcd34d !important; }
+
+/* Badges del sistema en oscuro */
+[data-theme='oscuro'] .badge-lectura     { background: rgba(59,130,246,.18);  color: #93c5fd; }
+[data-theme='oscuro'] .badge-reto        { background: rgba(249,115,22,.18);  color: #fdba74; }
+[data-theme='oscuro'] .badge-pregunta    { background: rgba(234,179,8,.18);   color: #fde047; }
+[data-theme='oscuro'] .badge-actividad   { background: rgba(20,184,166,.18);  color: #5eead4; }
+[data-theme='oscuro'] .badge-estudiante  { background: rgba(139,92,246,.20);  color: #c4b5fd; }
+[data-theme='oscuro'] .badge-aviso       { background: rgba(239,68,68,.18);   color: #fca5a5; }
+[data-theme='oscuro'] .badge-video       { background: rgba(236,72,153,.18);  color: #f9a8d4; }
+[data-theme='oscuro'] .badge-recurso     { background: rgba(148,163,184,.18); color: #cbd5e1; }
+
+/* La topbar de estudiante es blanca en claro; en oscuro sigue la superficie */
+[data-theme='oscuro'] .topbar            { background: var(--ar-surface); }
+
+
+/* ==================================================================
+   03. ACENTOS
+   El picker escribe data-accent="…" en <html>. Cambia todo lo que
+   use --ar-primary (botones, enlaces activos, progreso, halos).
+   ================================================================== */
+[data-accent='turquesa'] { --ar-primary:#0ea5a5; --ar-primary-dark:#0d8a8a; --ar-primary-light:#e0f7f7; --ar-primary-rgb:14,165,165; }
+[data-accent='violeta']  { --ar-primary:#7c3aed; --ar-primary-dark:#6d28d9; --ar-primary-light:#f1e9ff; --ar-primary-rgb:124,58,237; }
+[data-accent='azul']     { --ar-primary:#2563eb; --ar-primary-dark:#1d4ed8; --ar-primary-light:#e4edff; --ar-primary-rgb:37,99,235; }
+[data-accent='coral']    { --ar-primary:#f43f5e; --ar-primary-dark:#e11d48; --ar-primary-light:#ffe8ec; --ar-primary-rgb:244,63,94; }
+[data-accent='ambar']    { --ar-primary:#f59e0b; --ar-primary-dark:#d97706; --ar-primary-light:#fff2da; --ar-primary-rgb:245,158,11; }
+[data-accent='esmeralda']{ --ar-primary:#10b981; --ar-primary-dark:#059669; --ar-primary-light:#e2fbf1; --ar-primary-rgb:16,185,129; }
+
+/* En oscuro los "light" pasteles se vuelven veladuras del propio acento */
+[data-theme='oscuro'][data-accent] { --ar-primary-light: rgba(var(--ar-primary-rgb), 0.16); }
+
+
+/* ==================================================================
+   04. BASE
+   ================================================================== */
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply antialiased;
+    font-family: 'Nunito', system-ui, -apple-system, sans-serif;
+    background-color: var(--ar-bg);
+    color: var(--ar-text);
+    font-size: 16px;
+    line-height: 1.6;
+    transition: background-color var(--ar-dur-slow) var(--ar-ease),
+                color var(--ar-dur-slow) var(--ar-ease);
+  }
+
+  h1 { @apply text-2xl font-extrabold tracking-tight; }
+  h2 { @apply text-xl font-bold tracking-tight; }
+  h3 { @apply text-lg font-bold; }
+  h4 { @apply text-base font-semibold; }
+
+  p { @apply leading-relaxed; }
+
+  * { box-sizing: border-box; }
+
+  /* Foco visible y consistente para navegación por teclado */
+  :focus-visible {
+    outline: 2px solid var(--ar-primary);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background: rgba(var(--ar-primary-rgb), 0.22);
+    color: var(--ar-text-strong);
+  }
+
+  /* Scrollbar discreta, coherente con el tema */
+  * { scrollbar-width: thin; scrollbar-color: var(--ar-border-strong) transparent; }
+  *::-webkit-scrollbar { width: 10px; height: 10px; }
+  *::-webkit-scrollbar-track { background: transparent; }
+  *::-webkit-scrollbar-thumb {
+    background: var(--ar-border-strong);
+    border-radius: 999px;
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+  *::-webkit-scrollbar-thumb:hover { background: var(--ar-muted); background-clip: content-box; }
+}
+
+
+/* ==================================================================
+   05. MOTION
+   Keyframes + utilidades. Usa `.a-*` para entrada, `.stagger` para
+   listas y `.hover-lift` / `.press` para micro-interacción.
+   ================================================================== */
+@keyframes arFadeIn      { from { opacity:0 } to { opacity:1 } }
+@keyframes arFadeUp      { from { opacity:0; transform:translate3d(0,14px,0) } to { opacity:1; transform:none } }
+@keyframes arFadeDown    { from { opacity:0; transform:translate3d(0,-14px,0) } to { opacity:1; transform:none } }
+@keyframes arScaleIn     { from { opacity:0; transform:scale(.94) } to { opacity:1; transform:scale(1) } }
+@keyframes arPopIn       { 0% { opacity:0; transform:scale(.8) } 60% { opacity:1; transform:scale(1.04) } 100% { transform:scale(1) } }
+@keyframes arSlideLeft   { from { transform:translateX(-100%) } to { transform:translateX(0) } }
+@keyframes arSlideRight  { from { opacity:0; transform:translateX(24px) } to { opacity:1; transform:none } }
+@keyframes arShimmer     { from { transform:translateX(-100%) } to { transform:translateX(100%) } }
+@keyframes arFloat       { 0%,100% { transform:translateY(0) } 50% { transform:translateY(-6px) } }
+@keyframes arPulseRing   { 0% { box-shadow:0 0 0 0 rgba(var(--ar-primary-rgb),.45) } 70% { box-shadow:0 0 0 12px rgba(var(--ar-primary-rgb),0) } 100% { box-shadow:0 0 0 0 rgba(var(--ar-primary-rgb),0) } }
+@keyframes arCelebrate   { 0% { transform:scale(.6) rotate(-12deg); opacity:0 } 55% { transform:scale(1.15) rotate(6deg); opacity:1 } 100% { transform:scale(1) rotate(0) } }
+@keyframes arShake       { 0%,100% { transform:translateX(0) } 20%,60% { transform:translateX(-7px) } 40%,80% { transform:translateX(7px) } }
+@keyframes arGradientPan { 0% { background-position:0% 50% } 100% { background-position:200% 50% } }
+@keyframes arBreathe     { 0%,100% { opacity:.55 } 50% { opacity:1 } }
+@keyframes arSweep       { from { transform:translateX(-120%) skewX(-18deg) } to { transform:translateX(320%) skewX(-18deg) } }
+
+@layer utilities {
+  /* --- Entradas --- */
+  .a-fade      { animation: arFadeIn    var(--ar-dur-base)  var(--ar-ease-out) both; }
+  .a-fade-up   { animation: arFadeUp    var(--ar-dur-slow)  var(--ar-ease-out) both; }
+  .a-fade-down { animation: arFadeDown  var(--ar-dur-slow)  var(--ar-ease-out) both; }
+  .a-scale     { animation: arScaleIn   var(--ar-dur-base)  var(--ar-ease-out) both; }
+  .a-pop       { animation: arPopIn     var(--ar-dur-slow)  var(--ar-ease-spring) both; }
+  .a-slide-r   { animation: arSlideRight var(--ar-dur-slow) var(--ar-ease-out) both; }
+  .a-celebrate { animation: arCelebrate var(--ar-dur-slower) var(--ar-ease-spring) both; }
+  .a-shake     { animation: arShake     var(--ar-dur-slow)  var(--ar-ease) both; }
+
+  /* --- Bucles --- */
+  .a-float     { animation: arFloat 3.6s var(--ar-ease) infinite; }
+  .a-pulse-ring{ animation: arPulseRing 2s var(--ar-ease-out) infinite; }
+  .a-breathe   { animation: arBreathe 2.2s var(--ar-ease) infinite; }
+
+  /* --- Retardos manuales --- */
+  .a-d1 { animation-delay: 60ms }
+  .a-d2 { animation-delay: 120ms }
+  .a-d3 { animation-delay: 180ms }
+  .a-d4 { animation-delay: 240ms }
+  .a-d5 { animation-delay: 300ms }
+  .a-d6 { animation-delay: 360ms }
+
+  /* --- Stagger automático: los hijos entran en cascada --- */
+  .stagger > * { animation: arFadeUp var(--ar-dur-slow) var(--ar-ease-out) both; }
+  .stagger > *:nth-child(1)  { animation-delay: 0ms }
+  .stagger > *:nth-child(2)  { animation-delay: 55ms }
+  .stagger > *:nth-child(3)  { animation-delay: 110ms }
+  .stagger > *:nth-child(4)  { animation-delay: 165ms }
+  .stagger > *:nth-child(5)  { animation-delay: 220ms }
+  .stagger > *:nth-child(6)  { animation-delay: 275ms }
+  .stagger > *:nth-child(7)  { animation-delay: 330ms }
+  .stagger > *:nth-child(8)  { animation-delay: 385ms }
+  .stagger > *:nth-child(9)  { animation-delay: 440ms }
+  .stagger > *:nth-child(n+10) { animation-delay: 495ms }
+
+  /* --- Micro-interacciones --- */
+  .hover-lift {
+    transition: transform var(--ar-dur-base) var(--ar-ease-out),
+                box-shadow var(--ar-dur-base) var(--ar-ease-out);
+    will-change: transform;
+  }
+  .hover-lift:hover { transform: translateY(-3px); box-shadow: var(--ar-shadow-lg); }
+
+  .hover-glow { transition: box-shadow var(--ar-dur-base) var(--ar-ease-out); }
+  .hover-glow:hover { box-shadow: 0 0 0 4px rgba(var(--ar-primary-rgb), 0.16); }
+
+  .press { transition: transform var(--ar-dur-fast) var(--ar-ease-snap); }
+  .press:active { transform: scale(0.96); }
+
+  /* Brillo que barre un elemento (CTA destacado, tarjeta ganadora) */
+  .sweep { position: relative; overflow: hidden; }
+  .sweep::after {
+    content: '';
+    position: absolute; top: 0; bottom: 0; left: 0; width: 40%;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,.28), transparent);
+    animation: arSweep 2.6s var(--ar-ease) infinite;
+  }
+
+  /* Degradado animado para héroes y cabeceras */
+  .gradient-pan {
+    background-size: 200% 200%;
+    animation: arGradientPan 7s linear infinite alternate;
+  }
+
+  /* --- Compatibilidad con los nombres antiguos --- */
+  .fade-in       { animation: arFadeUp var(--ar-dur-slow) var(--ar-ease-out) both; }
+  .scale-in      { animation: arScaleIn var(--ar-dur-base) var(--ar-ease-out) both; }
+  .slide-in-left { animation: arSlideLeft var(--ar-dur-base) var(--ar-ease-out) forwards; }
+
+  /* --- Accesibilidad: respeta "reducir movimiento" del sistema --- */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+    .sweep::after { display: none; }
+  }
+}
+
+
+/* ==================================================================
+   06. SKELETONS
+   Piezas con la MISMA forma que el contenido real, para que al
+   cargar no salte el layout. Ver components/ui/Skeleton.jsx.
+   ================================================================== */
+@layer components {
+  .sk {
+    position: relative;
+    overflow: hidden;
+    background: var(--ar-skeleton-base);
+    border-radius: var(--ar-radius-sm);
+  }
+  .sk::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(90deg, transparent, var(--ar-skeleton-shine), transparent);
+    animation: arShimmer 1.5s var(--ar-ease) infinite;
+  }
+
+  .sk-line   { @apply sk; height: 0.75rem; border-radius: 999px; }
+  .sk-title  { @apply sk; height: 1.15rem; border-radius: 8px; }
+  .sk-circle { @apply sk; border-radius: 999px; }
+  .sk-block  { @apply sk; border-radius: var(--ar-radius-md); }
+
+  /* Contenedor que hereda la apariencia de card mientras carga */
+  .sk-card {
+    background: var(--ar-surface);
+    border: 1px solid var(--ar-border);
+    border-radius: var(--ar-radius-md);
+    box-shadow: var(--ar-shadow-sm);
+    overflow: hidden;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .sk::after { animation: arBreathe 1.8s ease-in-out infinite; transform: none; }
+  }
+}
+
+
+/* ==================================================================
+   07. COMPONENTES
+   ================================================================== */
+@layer components {
+
+  /* --- Botones --- */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 font-bold rounded-full
+           focus:outline-none focus:ring-2 focus:ring-offset-2
+           cursor-pointer select-none;
+    font-family: 'Nunito', sans-serif;
+    transition: transform var(--ar-dur-fast) var(--ar-ease-snap),
+                background-color var(--ar-dur-base) var(--ar-ease),
+                box-shadow var(--ar-dur-base) var(--ar-ease-out),
+                border-color var(--ar-dur-base) var(--ar-ease),
+                color var(--ar-dur-base) var(--ar-ease);
+  }
+  .btn:active { transform: scale(0.955); }
+  .btn:disabled { opacity: .55; cursor: not-allowed; transform: none; }
+
+  .btn-sm  { @apply btn px-4 py-1.5 text-sm; }
+  .btn-md  { @apply btn px-5 py-2.5 text-base; }
+  .btn-lg  { @apply btn px-7 py-3.5 text-lg; }
+
+  .btn-primary {
+    @apply btn-md text-white;
+    background: var(--ar-primary);
+    box-shadow: 0 4px 14px rgba(var(--ar-primary-rgb), 0.35);
+  }
+  .btn-primary:hover:not(:disabled) {
+    background: var(--ar-primary-dark);
+    box-shadow: 0 8px 22px rgba(var(--ar-primary-rgb), 0.42);
+    transform: translateY(-1px);
+  }
+  .btn-primary:active:not(:disabled) { transform: scale(0.955); }
+
+  .btn-secondary {
+    @apply btn-md bg-orange-500 text-white
+           hover:bg-orange-600 focus:ring-orange-400;
+    box-shadow: 0 4px 14px rgba(249,115,22,0.30);
+  }
+  .btn-secondary:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 8px 22px rgba(249,115,22,.4); }
+
+  .btn-ghost {
+    @apply btn-md bg-transparent focus:ring-slate-300;
+    color: var(--ar-muted);
+  }
+  .btn-ghost:hover { background: var(--ar-surface-2); color: var(--ar-text); }
+
+  .btn-outline {
+    @apply btn-md border-2;
+    border-color: var(--ar-border);
+    color: var(--ar-text);
+  }
+  .btn-outline:hover {
+    border-color: var(--ar-primary);
+    color: var(--ar-primary);
+    background: var(--ar-primary-light);
+  }
+
+  /* --- Cards --- */
+  .ar-card {
+    background: var(--ar-surface);
+    border-radius: var(--ar-radius-md);
+    border: 1px solid var(--ar-border);
+    box-shadow: var(--ar-shadow-sm);
+    overflow: hidden;
+    transition: background-color var(--ar-dur-base) var(--ar-ease),
+                border-color var(--ar-dur-base) var(--ar-ease),
+                box-shadow var(--ar-dur-base) var(--ar-ease-out),
+                transform var(--ar-dur-base) var(--ar-ease-out);
+  }
+
+  .ar-card-hover { @apply ar-card; }
+  .ar-card-hover:hover {
+    box-shadow: var(--ar-shadow-lg);
+    transform: translateY(-3px);
+    border-color: var(--ar-border-strong);
+  }
+
+  /* --- Post Card --- */
+  .post-card {
+    @apply ar-card mb-3;
+  }
+  .post-card:hover {
+    box-shadow: var(--ar-shadow-md);
+    transform: translateY(-2px);
+  }
+
+  .post-card-header { @apply flex items-center gap-3 p-4 pb-3; }
+  .post-card-body   { @apply px-4 pb-3; }
+  .post-card-footer {
+    @apply flex items-center gap-1 px-4 py-2;
+    border-top: 1px solid var(--ar-border);
+  }
+
+  /* --- Reaction Button --- */
+  .reaction-btn {
+    @apply inline-flex items-center gap-1.5 px-3 py-2 rounded-full
+           text-sm font-semibold cursor-pointer;
+    color: var(--ar-muted);
+    transition: background-color var(--ar-dur-fast) var(--ar-ease),
+                color var(--ar-dur-fast) var(--ar-ease),
+                transform var(--ar-dur-fast) var(--ar-ease-snap);
+  }
+  .reaction-btn:hover {
+    background: var(--ar-primary-light);
+    color: var(--ar-primary);
+    transform: translateY(-1px);
+  }
+  .reaction-btn:active { transform: scale(.92); }
+  .reaction-btn.active {
+    background: var(--ar-primary-light);
+    color: var(--ar-primary);
+  }
+  /* El emoji da un saltito al activarse */
+  .reaction-btn.active > span:first-child {
+    animation: arPopIn var(--ar-dur-slow) var(--ar-ease-spring);
+    display: inline-block;
+  }
+
+  /* --- Challenge Card (Reto rápido) --- */
+  .challenge-card {
+    @apply flex-shrink-0 relative overflow-hidden cursor-pointer;
+    width: 128px;
+    height: 168px;
+    border-radius: var(--ar-radius-md);
+    box-shadow: var(--ar-shadow-md);
+    transition: transform var(--ar-dur-base) var(--ar-ease-out),
+                box-shadow var(--ar-dur-base) var(--ar-ease-out);
+  }
+  .challenge-card:hover {
+    transform: translateY(-5px) scale(1.03);
+    box-shadow: var(--ar-shadow-xl);
+  }
+  .challenge-card:active { transform: translateY(-2px) scale(.99); }
+  /* Velo inferior para que el texto blanco siempre tenga contraste */
+  .challenge-card::after {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(to top, rgba(0,0,0,.55) 0%, rgba(0,0,0,.12) 45%, transparent 70%);
+    pointer-events: none;
+  }
+
+  /* --- Avatar --- */
+  .avatar {
+    @apply flex-shrink-0 overflow-hidden rounded-full flex items-center justify-center font-extrabold uppercase;
+  }
+  .avatar-sm  { @apply avatar w-9 h-9 text-sm; }
+  .avatar-md  { @apply avatar w-11 h-11 text-base; }
+  .avatar-lg  { @apply avatar w-14 h-14 text-xl; }
+
+  .rank-halo {
+    position: relative;
+    isolation: isolate;
+    box-shadow: 0 0 0 3px var(--rank-ring), 0 0 18px 5px var(--rank-glow);
+    transition: box-shadow var(--ar-dur-slow) var(--ar-ease-out);
+  }
+  .rank-bronce   { --rank-ring: #d97706; --rank-glow: rgba(217, 119, 6, .28); }
+  .rank-plata    { --rank-ring: #94a3b8; --rank-glow: rgba(148, 163, 184, .38); }
+  .rank-oro      { --rank-ring: #facc15; --rank-glow: rgba(250, 204, 21, .42); }
+  .rank-diamante { --rank-ring: #22d3ee; --rank-glow: rgba(34, 211, 238, .48); }
+
+  /* --- Badge / Tipo de publicación --- */
+  .ar-badge {
+    @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold;
+  }
+
+  .badge-lectura    { @apply ar-badge bg-blue-100 text-blue-700; }
+  .badge-reto       { @apply ar-badge bg-orange-100 text-orange-700; }
+  .badge-pregunta   { @apply ar-badge bg-yellow-100 text-yellow-800; }
+  .badge-actividad  { @apply ar-badge bg-teal-100 text-teal-700; }
+  .badge-estudiante { @apply ar-badge bg-purple-100 text-purple-700; }
+  .badge-aviso      { @apply ar-badge bg-red-100 text-red-700; }
+  .badge-video      { @apply ar-badge bg-pink-100 text-pink-700; }
+  .badge-recurso    { @apply ar-badge bg-slate-100 text-slate-700; }
+
+  /* --- TopBar --- */
+  .topbar {
+    @apply fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-4;
+    height: 56px;
+    background: var(--ar-surface);
+    border-bottom: 1px solid var(--ar-border);
+    box-shadow: var(--ar-shadow-sm);
+    transition: background-color var(--ar-dur-slow) var(--ar-ease),
+                border-color var(--ar-dur-slow) var(--ar-ease);
+  }
+
+  .topbar-teacher {
+    background: var(--ar-teacher);
+    border-color: transparent;
+    color: white;
+    box-shadow: 0 2px 8px rgba(124,58,237,0.25);
+  }
+
+  .topbar-admin {
+    background: var(--ar-admin);
+    border-color: transparent;
+    color: white;
+  }
+
+  /* --- Bottom Navigation --- */
+  .bottom-nav {
+    @apply fixed bottom-0 left-0 right-0 z-50 flex items-center justify-around;
+    height: 64px;
+    background: var(--ar-surface);
+    border-top: 1px solid var(--ar-border);
+    box-shadow: 0 -2px 12px rgba(0,0,0,0.08);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .bottom-nav-item {
+    @apply flex flex-col items-center justify-center gap-0.5 flex-1 h-full
+           cursor-pointer select-none;
+    color: var(--ar-subtle);
+    font-size: 10px;
+    font-weight: 700;
+    transition: color var(--ar-dur-base) var(--ar-ease),
+                transform var(--ar-dur-fast) var(--ar-ease-snap);
+  }
+  .bottom-nav-item:active { transform: scale(.9); }
+  .bottom-nav-item.active { color: var(--ar-primary); }
+  /* El icono activo sube un pelín y aparece un punto debajo */
+  .bottom-nav-item.active > svg { transform: translateY(-2px); }
+  .bottom-nav-item > svg { transition: transform var(--ar-dur-base) var(--ar-ease-spring); }
+
+  .bottom-nav-create {
+    @apply flex items-center justify-center rounded-full text-white;
+    width: 50px;
+    height: 50px;
+    background: linear-gradient(135deg, var(--ar-primary), var(--ar-primary-dark));
+    box-shadow: 0 4px 16px rgba(var(--ar-primary-rgb), 0.45);
+    margin-bottom: 8px;
+    transition: transform var(--ar-dur-base) var(--ar-ease-spring),
+                box-shadow var(--ar-dur-base) var(--ar-ease-out);
+  }
+  .bottom-nav-create:hover { transform: translateY(-2px) rotate(90deg); box-shadow: 0 8px 22px rgba(var(--ar-primary-rgb), .55); }
+  .bottom-nav-create:active { transform: scale(0.9); }
+
+  /* --- Side Menu --- */
+  .side-menu-overlay {
+    @apply fixed inset-0 z-50;
+    background: rgba(2, 6, 23, 0.5);
+    backdrop-filter: blur(3px);
+    animation: arFadeIn var(--ar-dur-base) var(--ar-ease) both;
+  }
+
+  .side-menu {
+    @apply absolute top-0 left-0 h-full overflow-y-auto;
+    width: min(320px, 85vw);
+    background: var(--ar-surface);
+    box-shadow: var(--ar-shadow-xl);
+    padding-bottom: 32px;
+  }
+
+  .side-menu-section { @apply px-4 pt-5 pb-2; }
+
+  .side-menu-section-title {
+    @apply text-xs font-extrabold uppercase tracking-widest px-3 mb-1;
+    color: var(--ar-subtle);
+  }
+
+  .side-menu-item {
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-xl
+           font-semibold text-sm cursor-pointer;
+    color: var(--ar-text);
+    transition: background-color var(--ar-dur-fast) var(--ar-ease),
+                color var(--ar-dur-fast) var(--ar-ease),
+                transform var(--ar-dur-fast) var(--ar-ease-out);
+  }
+  .side-menu-item:hover {
+    background: var(--ar-primary-light);
+    color: var(--ar-primary);
+    transform: translateX(3px);
+  }
+  .side-menu-item.active {
+    background: var(--ar-primary-light);
+    color: var(--ar-primary);
+  }
+
+  /* --- Input --- */
+  .ar-input {
+    @apply w-full rounded-xl outline-none font-[Nunito];
+    padding: 12px 16px;
+    font-size: 16px;
+    background: var(--ar-surface);
+    color: var(--ar-text);
+    border: 1px solid var(--ar-border);
+    transition: border-color var(--ar-dur-base) var(--ar-ease),
+                box-shadow var(--ar-dur-base) var(--ar-ease-out),
+                background-color var(--ar-dur-base) var(--ar-ease);
+  }
+  .ar-input::placeholder { color: var(--ar-subtle); }
+  .ar-input:focus {
+    border-color: var(--ar-primary);
+    box-shadow: var(--ar-ring);
+  }
+
+  /* --- Create Box --- */
+  .create-box {
+    @apply ar-card p-4 flex items-center gap-3 cursor-pointer mb-3;
+  }
+  .create-box:hover { box-shadow: var(--ar-shadow-md); }
+
+  /* --- Moderation Card --- */
+  .mod-card { @apply ar-card mb-3; }
+
+  /* --- Progress bar --- */
+  .ar-progress-track {
+    @apply w-full rounded-full overflow-hidden;
+    background: var(--ar-surface-sunken);
+    height: 10px;
+  }
+  .ar-progress-fill {
+    @apply h-full rounded-full;
+    background: linear-gradient(90deg, var(--ar-primary), var(--ar-primary-dark));
+    transition: width var(--ar-dur-slower) var(--ar-ease-out);
+    position: relative;
+    overflow: hidden;
+  }
+  /* Brillo que recorre la barra mientras hay progreso */
+  .ar-progress-fill::after {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,.35), transparent);
+    transform: translateX(-100%);
+    animation: arShimmer 2.2s var(--ar-ease) infinite;
+  }
+
+  /* --- Step indicator (wizard) --- */
+  .step-dot {
+    @apply w-2.5 h-2.5 rounded-full;
+    background: var(--ar-border-strong);
+    transition: width var(--ar-dur-slow) var(--ar-ease-spring),
+                background-color var(--ar-dur-slow) var(--ar-ease);
+  }
+  .step-dot.active { @apply w-6; background: var(--ar-primary); }
+  .step-dot.done   { background: var(--ar-primary); opacity: 0.5; }
+
+  /* --- Section Divider --- */
+  .ar-section-title {
+    @apply text-xs font-extrabold uppercase tracking-widest px-1 mb-3;
+    color: var(--ar-muted);
+  }
+
+  /* --- Notification dot --- */
+  .notif-dot {
+    @apply absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-red-500;
+    border: 2px solid var(--ar-surface);
+  }
+
+  /* --- Fondo de la pantalla de acceso (sigue el tema) --- */
+  .auth-bg {
+    background: linear-gradient(135deg,
+      var(--ar-primary-light) 0%,
+      var(--ar-bg) 50%,
+      var(--ar-bg-alt) 100%);
+  }
+  [data-theme='oscuro'] .auth-bg {
+    background: linear-gradient(135deg,
+      var(--ar-bg) 0%,
+      var(--ar-bg-alt) 55%,
+      rgba(var(--ar-primary-rgb), 0.16) 100%);
+  }
+
+  /* --- Chip de filtro (feed, listados) --- */
+  .ar-chip {
+    @apply flex-shrink-0 px-4 py-1.5 rounded-full text-xs font-extrabold cursor-pointer;
+    background: var(--ar-surface);
+    color: var(--ar-muted);
+    border: 1px solid var(--ar-border);
+    transition: all var(--ar-dur-base) var(--ar-ease-out);
+  }
+  .ar-chip:hover {
+    border-color: var(--ar-primary);
+    color: var(--ar-primary);
+    transform: translateY(-1px);
+  }
+  .ar-chip.active {
+    background: var(--ar-primary);
+    border-color: var(--ar-primary);
+    color: #fff;
+    box-shadow: 0 4px 12px rgba(var(--ar-primary-rgb), .35);
+  }
+
+  /* =========================================
+     BACKWARD-COMPAT ALIASES
+     Para páginas existentes que usan clases antiguas
+     ========================================= */
+  .card      { @apply ar-card; }
+  .card-hover { @apply ar-card-hover; }
+  .badge     { @apply ar-badge; }
+  .badge-teal   { @apply ar-badge bg-teal-100 text-teal-700; }
+  .badge-orange { @apply ar-badge bg-orange-100 text-orange-700; }
+  .badge-purple { @apply ar-badge bg-purple-100 text-purple-700; }
+  .badge-slate  { @apply ar-badge bg-slate-100 text-slate-600; }
+  .badge-green  { @apply ar-badge bg-green-100 text-green-700; }
+  .badge-pink   { @apply ar-badge bg-pink-100 text-pink-700; }
+  .badge-sky    { @apply ar-badge bg-sky-100 text-sky-700; }
+  .badge-emerald { @apply ar-badge bg-emerald-100 text-emerald-700; }
+  .badge-blue   { @apply ar-badge bg-blue-100 text-blue-700; }
+  .badge-yellow { @apply ar-badge bg-yellow-100 text-yellow-800; }
+
+  .input { @apply ar-input; }
+}
+
+
+/* ==================================================================
+   08. PUBLICACIONES — personalización visual
+   Cada publicación puede llevar un acento y un patrón de portada.
+   Se aplica poniendo .pub-themed + .pub-a-<acento> + .pub-p-<patrón>.
+   ================================================================== */
+@layer components {
+  .pub-themed { --pub-accent: var(--ar-primary); --pub-soft: var(--ar-primary-light); --pub-ink: var(--ar-primary-dark); }
+
+  .pub-a-turquesa  { --pub-accent:#0ea5a5; --pub-soft:#e0f7f7; --pub-ink:#0f766e; }
+  .pub-a-violeta   { --pub-accent:#7c3aed; --pub-soft:#f1e9ff; --pub-ink:#5b21b6; }
+  .pub-a-azul      { --pub-accent:#2563eb; --pub-soft:#e4edff; --pub-ink:#1d4ed8; }
+  .pub-a-coral     { --pub-accent:#f43f5e; --pub-soft:#ffe8ec; --pub-ink:#be123c; }
+  .pub-a-ambar     { --pub-accent:#f59e0b; --pub-soft:#fff2da; --pub-ink:#b45309; }
+  .pub-a-esmeralda { --pub-accent:#10b981; --pub-soft:#e2fbf1; --pub-ink:#047857; }
+  .pub-a-rosa      { --pub-accent:#ec4899; --pub-soft:#ffe8f4; --pub-ink:#be185d; }
+  .pub-a-indigo    { --pub-accent:#6366f1; --pub-soft:#e8eaff; --pub-ink:#4338ca; }
+
+  [data-theme='oscuro'] .pub-themed { --pub-soft: rgba(255,255,255,.06); }
+
+  /* Franja de acento a la izquierda de la tarjeta */
+  .pub-themed.pub-bar { border-left: 4px solid var(--pub-accent); }
+
+  /* Cabecera tintada con el acento */
+  .pub-head {
+    background: var(--pub-soft);
+    border-bottom: 1px solid var(--ar-border);
+  }
+
+  /* Portada generada por patrón cuando no hay imagen */
+  .pub-cover {
+    position: relative;
+    height: 132px;
+    background: linear-gradient(135deg, var(--pub-accent), var(--pub-ink));
+    overflow: hidden;
+  }
+  .pub-cover::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    opacity: .38;
+  }
+
+  .pub-p-puntos::before {
+    background-image: radial-gradient(circle, rgba(255,255,255,.9) 1.5px, transparent 1.6px);
+    background-size: 16px 16px;
+  }
+  .pub-p-rejilla::before {
+    background-image:
+      linear-gradient(rgba(255,255,255,.55) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,.55) 1px, transparent 1px);
+    background-size: 22px 22px;
+  }
+  .pub-p-ondas::before {
+    background-image: repeating-radial-gradient(circle at 0 100%, transparent 0 12px, rgba(255,255,255,.5) 12px 13px);
+  }
+  .pub-p-rayos::before {
+    background-image: repeating-linear-gradient(115deg, rgba(255,255,255,.42) 0 10px, transparent 10px 26px);
+  }
+  .pub-p-confeti::before {
+    background-image:
+      radial-gradient(circle at 20% 30%, rgba(255,255,255,.85) 2px, transparent 3px),
+      radial-gradient(circle at 70% 65%, rgba(255,255,255,.7) 2.5px, transparent 3.5px),
+      radial-gradient(circle at 45% 85%, rgba(255,255,255,.6) 2px, transparent 3px);
+    background-size: 70px 70px, 90px 90px, 60px 60px;
+  }
+  .pub-p-liso::before { background: none; }
+
+  /* Etiqueta/acciones que heredan el acento de la publicación */
+  .pub-chip {
+    @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold;
+    background: var(--pub-soft);
+    color: var(--pub-ink);
+  }
+  [data-theme='oscuro'] .pub-chip { color: var(--pub-accent); }
+}
+
+
+/* ==================================================================
+   09. FICHAS 3D — quiz
+   Giro real con transform 3D: dos caras superpuestas y el contenedor
+   rotando en Y. No hay librería de por medio; `backface-visibility`
+   es lo que oculta la cara de atrás mientras gira.
+   ================================================================== */
+.ficha3d {
+  perspective: 1400px;
+  width: 100%;
+}
+
+.ficha3d-inner {
+  position: relative;
+  width: 100%;
+  min-height: 15rem;
+  transform-style: preserve-3d;
+  transition: transform .6s cubic-bezier(.22,.68,.36,1);
+}
+
+.ficha3d.is-flipped .ficha3d-inner { transform: rotateY(180deg); }
+
+.ficha3d-cara {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: .75rem;
+  padding: 1.75rem;
+  border-radius: 1.5rem;
+  border: 2px solid;
+  text-align: center;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.ficha3d-cara.atras { transform: rotateY(180deg); }
+
+/* La cara visible manda en la altura: sin esto el contenedor absoluto
+   colapsaría y las fichas largas se cortarían. */
+.ficha3d-medidor {
+  visibility: hidden;
+  padding: 1.75rem;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ficha3d-inner { transition: none; }
+}
+
+/* ==================================================================
+   10. UTILIDADES
+   ================================================================== */
+@layer utilities {
+  .safe-bottom { padding-bottom: env(safe-area-inset-bottom, 16px); }
+
+  .line-clamp-1 { display:-webkit-box; -webkit-line-clamp:1; -webkit-box-orient:vertical; overflow:hidden; }
+  .line-clamp-2 { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .line-clamp-3 { display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+
+  /* Oculta la barra de scroll pero mantiene el desplazamiento */
+  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+
+  /* Content area for main layout */
+  .main-content {
+    padding-top: 56px;    /* topbar height */
+    padding-bottom: 72px; /* bottom nav height */
+    min-height: 100vh;
+  }
+
+  /* Desktop: no bottom nav, use sidebar */
+  @media (min-width: 768px) {
+    .main-content { padding-bottom: 0; }
+  }
+
+  /* Feed container */
+  .feed-container {
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 12px 12px 0;
+  }
+
+  @media (min-width: 768px) {
+    .feed-container { padding: 20px 16px 0; }
+  }
+}

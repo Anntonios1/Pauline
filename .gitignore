@@ -1,0 +1,35 @@
+# Datos reales de estudiantes: nunca al repo.
+blog.db
+blog.db-shm
+blog.db-wal
+backups/
+uploads/
+logs/
+backend.log
+backend.err
+*.log
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+
+# Secretos / config local
+.env
+.env.local
+*.env.local
+
+# Certificado TLS de dev huérfano (la feature que lo usaba ya no existe:
+# ver api/config/settings.py). Una clave privada no va al repo aunque no
+# proteja nada real.
+api/certs/
+
+# Estado local de herramientas, no del proyecto
+.claude/
+.freebuff/
+.qoder/
+docx_qa/
