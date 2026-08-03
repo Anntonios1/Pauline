@@ -6,7 +6,9 @@ import {
   ArrowUp,
   Check,
   CheckCircle2,
+  Download,
   File,
+  FileJson,
   Gamepad2,
   Image,
   Info,
@@ -18,12 +20,14 @@ import {
   Settings2,
   Trash2,
   Type,
+  Upload,
   X,
 } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useData } from '../../contexts/DataContext'
 import { PageHeader, Card, SectionTitle } from '../../components/ui'
 import { handleUnauthorized } from '../../services/api'
+import { quizToJson, quizFromJson } from '../../utils/quizJson'
 
 const BLOCK_TYPES = [
   {
@@ -891,6 +895,99 @@ function BlockEditor({ block, index, total, errors, onChange, onRemove, onMove, 
   )
 }
 
+/* Import/export del quiz como JSON. El mismo formato que acepta la API, así que
+   sirve para respaldar, duplicar entre docentes, o pegar uno redactado fuera
+   de la app. Importar reemplaza el borrador entero: se pide confirmación si hay
+   algo escrito. */
+function JsonPanel({ onExport, onImport, bloqueado, vacio }) {
+  const [abierto, setAbierto] = useState(false)
+  const [pegado, setPegado] = useState('')
+  const [error, setError] = useState('')
+  const [aviso, setAviso] = useState('')
+
+  const aplicar = (texto, origen) => {
+    if (!vacio && !window.confirm('Esto reemplaza el quiz que tienes en pantalla. ¿Continuar?')) return
+    const fallo = onImport(texto)
+    setError(fallo)
+    if (!fallo) {
+      setAviso(`Quiz cargado desde ${origen}. Revisa la unidad de la ruta: no viaja en el archivo.`)
+      setPegado('')
+      setAbierto(false)
+    } else {
+      setAviso('')
+    }
+  }
+
+  const cargarArchivo = (archivo) => {
+    if (!archivo) return
+    const lector = new FileReader()
+    lector.onload = () => aplicar(String(lector.result), archivo.name)
+    lector.onerror = () => setError('No se pudo leer el archivo.')
+    lector.readAsText(archivo)
+  }
+
+  return (
+    <Card className="mb-6 border-2 border-slate-200 bg-white p-4 sm:p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h2 className="flex items-center gap-2 text-sm font-extrabold text-slate-900">
+            <FileJson size={17} /> Copia de seguridad en JSON
+          </h2>
+          <p className="mt-0.5 text-xs text-slate-600">
+            Guarda este quiz en un archivo, o carga uno que ya tengas.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button" onClick={onExport} disabled={bloqueado || vacio}
+            className="inline-flex items-center gap-2 rounded-xl border-2 border-slate-300 px-3.5 py-2 text-xs font-extrabold text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+          >
+            <Download size={15} /> Exportar
+          </button>
+          <button
+            type="button" onClick={() => { setAbierto((v) => !v); setError(''); setAviso('') }}
+            disabled={bloqueado}
+            className="inline-flex items-center gap-2 rounded-xl border-2 border-slate-300 px-3.5 py-2 text-xs font-extrabold text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+          >
+            <Upload size={15} /> Importar
+          </button>
+        </div>
+      </div>
+
+      {aviso && <p className="mt-3 rounded-xl bg-emerald-50 p-3 text-xs font-semibold text-emerald-900">{aviso}</p>}
+
+      {abierto && (
+        <div className="mt-4 space-y-3 border-t border-slate-100 pt-4">
+          <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-slate-900 px-3.5 py-2 text-xs font-extrabold text-white hover:bg-slate-700">
+            <Upload size={15} /> Elegir archivo .json
+            <input
+              type="file" accept="application/json,.json" className="sr-only"
+              onChange={(event) => { cargarArchivo(event.target.files?.[0]); event.target.value = '' }}
+            />
+          </label>
+          <p className="text-xs font-semibold text-slate-500">…o pega el JSON aquí:</p>
+          <textarea
+            value={pegado}
+            onChange={(event) => setPegado(event.target.value)}
+            rows={6}
+            spellCheck={false}
+            placeholder='{ "titulo": "…", "items": [ … ] }'
+            className="w-full resize-y rounded-xl border-2 border-slate-200 p-3 font-mono text-xs outline-none focus:border-teal-500"
+          />
+          <button
+            type="button" onClick={() => aplicar(pegado, 'el texto pegado')}
+            disabled={!pegado.trim()}
+            className="rounded-xl bg-teal-600 px-4 py-2 text-xs font-extrabold text-white hover:bg-teal-700 disabled:opacity-40"
+          >
+            Cargar el JSON pegado
+          </button>
+          {error && <p className="rounded-xl bg-rose-50 p-3 text-xs font-semibold text-rose-800">{error}</p>}
+        </div>
+      )}
+    </Card>
+  )
+}
+
 export default function TeacherCreatorPage() {
   const { token } = useAuth()
   const { categories, refresh } = useData()
@@ -1020,6 +1117,35 @@ export default function TeacherCreatorPage() {
     })
   }
 
+  const exportarJson = () => {
+    const nombre = (form.titulo.trim() || 'quiz')
+      .toLocaleLowerCase('es').normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'quiz'
+    const blob = new Blob([JSON.stringify(quizToJson(form, items), null, 2)], {
+      type: 'application/json',
+    })
+    const url = URL.createObjectURL(blob)
+    const enlace = Object.assign(document.createElement('a'), { href: url, download: `${nombre}.json` })
+    enlace.click()
+    URL.revokeObjectURL(url)
+  }
+
+  // Devuelve un mensaje de error, o '' si importó bien: el panel lo muestra.
+  const importarJson = (texto) => {
+    try {
+      const { form: nuevoForm, items: nuevosItems } = quizFromJson(texto)
+      setForm(nuevoForm)
+      setItems(nuevosItems)
+      setCover(null)
+      setValidation({ fieldErrors: {}, itemErrors: {}, generalErrors: [] })
+      setSubmitError('')
+      setSuccess(null)
+      return ''
+    } catch (error) {
+      return error.message || 'No se pudo leer el archivo.'
+    }
+  }
+
   const handleSubmit = async (event) => {
     event.preventDefault()
     setSubmitError('')
@@ -1110,6 +1236,13 @@ export default function TeacherCreatorPage() {
           <span className="rounded-full bg-white/15 px-3 py-1.5">Guardado completo en una sola operación</span>
         </div>
       </PageHeader>
+
+      <JsonPanel
+        onExport={exportarJson}
+        onImport={importarJson}
+        bloqueado={isSaving}
+        vacio={items.length === 0 && !form.titulo.trim()}
+      />
 
       <form onSubmit={handleSubmit} noValidate className="space-y-6">
         <Card className="border-2 border-slate-200 bg-white p-5 sm:p-6">

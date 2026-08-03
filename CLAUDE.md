@@ -54,7 +54,10 @@ npm run dev       # http://localhost:5173, proxies /api, /uploads, /ws to :8000
 npm run build
 npm run preview
 ```
-No test suite or linter is configured for the frontend.
+No test runner or linter is configured for the frontend. The one exception is
+`frontend/src/utils/quizJson.test.mjs`, a plain `node` script with `assert`s covering the
+quiz import/export round-trip (run it with `node frontend/src/utils/quizJson.test.mjs`).
+Nothing imports it, so it never reaches the bundle.
 
 ### Running both together
 `start-debug.bat` starts backend (uvicorn, port 8000, debug logging) and frontend (Vite, port 5173) as background processes, reusing them if already running, and writes logs to `logs/backend.log` / `logs/frontend.log`.
