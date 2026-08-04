@@ -238,7 +238,9 @@ export default function ModerationPage() {
               <button
                 key={f.key}
                 onClick={() => setFilter(f.key)}
-                className={`flex-shrink-0 px-4 py-1.5 rounded-full text-xs font-extrabold transition-all
+                /* py-2.5 en móvil: con py-1.5 la píldora quedaba en 30px de
+                   alto, incómoda de acertar con el dedo. */
+                className={`flex-shrink-0 px-4 py-2.5 sm:py-1.5 rounded-full text-xs font-extrabold transition-all
                   ${filter === f.key
                     ? 'bg-purple-600 text-white'
                     : 'bg-white text-slate-600 border border-slate-200 hover:border-purple-400'

@@ -94,6 +94,14 @@ export async function moderatePublication(id, data) {
   })
 }
 
+/** Pone o quita una reacción. Devuelve { reacciones, mis_reacciones, activa }. */
+export async function toggleReaction(publicationId, tipo) {
+  return fetchWithAuth(`/publications/${publicationId}/reactions`, {
+    method: 'POST',
+    body: JSON.stringify({ tipo }),
+  })
+}
+
 export async function getActivities(params = {}) {
   const searchParams = new URLSearchParams(params)
   return fetchWithAuth(`/activities?${searchParams}`)

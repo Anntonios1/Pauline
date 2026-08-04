@@ -9,6 +9,9 @@ import { Plus, Map as MapIcon, BarChart3, BookOpen, Compass, CalendarDays, Clock
 import { useLocation } from 'react-router-dom'
 import * as api from '../../services/api'
 
+/* Emblema de cada rango; las clases rank-* del CSS le ponen el halo de color. */
+const RANK_EMOJI = { bronce: '🥉', plata: '🥈', oro: '🥇', diamante: '💎' }
+
 /* Desktop sidebar links for student */
 const desktopLinks = [
   { path: '/',         label: 'Inicio',       icon: null },
@@ -27,6 +30,7 @@ export default function StudentLayout() {
   const attempted = progress.filter(item => Number(item.total_intentos || 0) > 0).length
   const perfect = progress.filter(item => Number(item.mejor_porcentaje) === 100).length
   const profileRank = perfect >= 5 ? 'diamante' : perfect >= 3 ? 'oro' : attempted >= 3 ? 'plata' : 'bronce'
+  const porcentajeRuta = progress.length ? Math.round((attempted / progress.length) * 100) : 0
   const [classEvents, setClassEvents] = useState([])
   useEffect(() => { api.getClassEvents().then(setClassEvents).catch(() => setClassEvents([])) }, [])
   const nextEvent = classEvents[0]
@@ -87,26 +91,33 @@ export default function StudentLayout() {
         {/* Right sidebar — compact */}
         <aside className="w-72 flex-shrink-0">
           <div className="sticky top-20 space-y-4">
-            {/* Ruta rápida */}
-            <div className="ar-card p-4">
-              <h4 className="font-bold text-slate-900 mb-3 flex items-center gap-2">
-                <MapIcon size={16} className="text-[color:var(--ar-primary)]" />
-                Mi ruta
-              </h4>
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 text-sm">
-                  <span className="text-green-500 text-base">✅</span>
-                  <span className="text-slate-500 line-through text-xs">Unidad 1: Mi cuerpo</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <span className="text-[color:var(--ar-primary)] text-base">▶️</span>
-                  <span className="font-semibold text-slate-900 text-xs">Unidad 2: La pubertad</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <span className="text-slate-300 text-base">🔒</span>
-                  <span className="text-slate-400 text-xs">Unidad 3: Sistemas</span>
-                </div>
+            {/* Emblema de rango + progreso real. Antes aquí había tres unidades
+                escritas a mano ("Unidad 1: Mi cuerpo"…) que no salían de ningún
+                dato: mostraban lo mismo para todo el mundo. */}
+            <div className="ar-card p-4 text-center">
+              <div
+                className={`avatar-lg rank-halo rank-${profileRank} mx-auto bg-[color:var(--ar-primary)] text-white`}
+                title={`Rango ${profileRank}`}
+              >
+                {RANK_EMOJI[profileRank]}
               </div>
+              <p className="mt-2 text-sm font-extrabold capitalize text-slate-900">
+                Rango {profileRank}
+              </p>
+
+              <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100" role="progressbar"
+                   aria-valuenow={porcentajeRuta} aria-valuemin="0" aria-valuemax="100"
+                   aria-label="Progreso de la ruta">
+                <div
+                  className="h-full rounded-full bg-[color:var(--ar-primary)]"
+                  style={{ width: `${porcentajeRuta}%`, transition: 'width var(--ar-dur-slower) var(--ar-ease-out)' }}
+                />
+              </div>
+              <p className="mt-1.5 text-xs font-semibold text-[color:var(--ar-muted)]">
+                {attempted} de {progress.length} actividades
+                {perfect > 0 && <> · <span className="text-amber-600">{perfect} perfecta{perfect === 1 ? '' : 's'}</span></>}
+              </p>
+
               <button onClick={() => navigate('/mi-ruta')} className="mt-3 text-xs font-bold text-[color:var(--ar-primary)] hover:underline">
                 Ver ruta completa →
               </button>

@@ -2,6 +2,7 @@ from api.database.connection import get_db, close_db, list_to_dicts
 from api.models import Comentario, EventoAprendizaje, Auditoria
 from api.services.notifications import crear_notificacion
 from api.utils.helpers import now_utc
+from api.websocket.feed_manager import feed_manager
 
 
 def crear_comentario(comentario: Comentario) -> dict:
@@ -16,7 +17,12 @@ def crear_comentario(comentario: Comentario) -> dict:
              comentario.contenido, comentario.estado),
         )
         conn.commit()
-        return obtener_comentario_por_id(cursor.lastrowid)
+        creado = obtener_comentario_por_id(cursor.lastrowid)
+        # Un comentario de estudiante nace 'pendiente' y no se ve hasta que lo
+        # aprueben: solo se avisa de los que ya son visibles (los del docente).
+        if creado and creado["estado"] == "aprobado":
+            feed_manager.publicar("comentario_nuevo", {"publicacion_id": creado["publicacion_id"]})
+        return creado
     finally:
         close_db(conn)
 
@@ -69,6 +75,8 @@ def moderar_comentario(comentario_id: int, estado: str, moderado_por: int) -> di
             cuerpo=f'En "{publicacion["titulo"]}"' if publicacion else None,
             enlace=f"/lecturas/{publicacion['slug']}" if publicacion and estado == "aprobado" else None,
         )
+        if estado == "aprobado":
+            feed_manager.publicar("comentario_nuevo", {"publicacion_id": actualizado["publicacion_id"]})
         return actualizado
     finally:
         close_db(conn)

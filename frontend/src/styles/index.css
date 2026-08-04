@@ -786,8 +786,10 @@
   }
 
   /* --- Chip de filtro (feed, listados) --- */
+  /* py-2.5 en movil: con py-1.5 el chip queda en 30px de alto y se falla al
+     tocarlo con el dedo. En pantalla grande, donde hay raton, se compacta. */
   .ar-chip {
-    @apply flex-shrink-0 px-4 py-1.5 rounded-full text-xs font-extrabold cursor-pointer;
+    @apply flex-shrink-0 px-4 py-2.5 sm:py-1.5 rounded-full text-xs font-extrabold cursor-pointer;
     background: var(--ar-surface);
     color: var(--ar-muted);
     border: 1px solid var(--ar-border);

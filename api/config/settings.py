@@ -63,6 +63,11 @@ ALLOWED_ESTADOS_PUBLICACION = [
 ALLOWED_DIFICULTADES = ["basica", "media", "avanzada"]
 ALLOWED_DECISIONES_MODERACION = ["aprobar", "corregir", "rechazar"]
 
+# Reacciones a una publicacion. Deben coincidir con el CHECK de
+# publicacion_reacciones en schema.sql y con REACCIONES en
+# frontend/src/components/ui/PostCard.jsx.
+ALLOWED_REACCIONES = ["entendi", "sorpresa", "duda", "practicar"]
+
 # Personalización visual de una publicación (columna publicaciones.estilo_visual).
 # Los valores deben coincidir con las clases .pub-a-* / .pub-p-* del monolito CSS
 # en frontend/src/styles/index.css (sección 08).

@@ -58,10 +58,23 @@ export function DataProvider({ children }) {
     loadData()
   }, [loadData])
 
+  /** Recarga solo las publicaciones aprobadas: es lo que cambia cuando alguien
+   *  reacciona, comenta o el docente aprueba algo. Barato comparado con loadData. */
+  const refreshPublications = useCallback(async () => {
+    try {
+      setPublications(await api.getPublications())
+    } catch (err) {
+      setError(err.message)
+    }
+  }, [])
+
   const refreshProgress = useCallback(async () => {
     if (!isAuthenticated) return
     try {
-      const [prog, pend, misLogros] = await Promise.all([
+      // Las publicaciones entran aquí a propósito: al aprobar desde moderación
+      // se llamaba a esta función y el feed no se enteraba, porque solo se
+      // recargaba la cola de pendientes. La aprobada no aparecía hasta recargar.
+      const [prog, pend, misLogros, pubs] = await Promise.all([
         api.getProgress(),
         isStaff
           ? Promise.all(PENDING_STATES.map(s => api.getPublications({ estado: s }))).then(
@@ -69,10 +82,12 @@ export function DataProvider({ children }) {
             )
           : Promise.resolve([]),
         api.getMisLogros(),
+        api.getPublications(),
       ])
       setProgress(prog)
       setPendingPublications(pend)
       setLogros(misLogros)
+      setPublications(pubs)
     } catch (err) {
       setError(err.message)
     }
@@ -96,6 +111,7 @@ export function DataProvider({ children }) {
     error,
     refresh: loadData,
     refreshProgress,
+    refreshPublications,
     getCategoryBySlug,
     getCategoryById,
     getPublicationBySlug,

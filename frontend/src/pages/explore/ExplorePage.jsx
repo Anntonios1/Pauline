@@ -42,7 +42,7 @@ export default function ExplorePage() {
           <button
             key={t.key}
             onClick={() => setTab(t.key)}
-            className={`flex-shrink-0 px-4 py-1.5 rounded-full text-xs font-extrabold transition-all
+            className={`flex-shrink-0 px-4 py-2.5 sm:py-1.5 rounded-full text-xs font-extrabold transition-all
               ${tab === t.key
                 ? 'bg-[color:var(--ar-primary)] text-white'
                 : 'bg-white text-slate-600 border border-slate-200 hover:border-[color:var(--ar-primary)]'

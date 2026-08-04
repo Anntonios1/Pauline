@@ -233,6 +233,21 @@ CREATE INDEX IF NOT EXISTS idx_comentarios_publicacion
 CREATE INDEX IF NOT EXISTS idx_comentarios_padre ON comentarios(comentario_padre_id);
 CREATE INDEX IF NOT EXISTS idx_comentarios_autor ON comentarios(autor_id);
 
+-- Reacciones a una publicacion. La clave primaria compuesta es lo que impide
+-- que la misma persona sume dos veces la misma reaccion: la restriccion vive en
+-- la base, no en el codigo que la llama.
+CREATE TABLE IF NOT EXISTS publicacion_reacciones (
+    publicacion_id  INTEGER NOT NULL REFERENCES publicaciones(id) ON DELETE CASCADE,
+    usuario_id      INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+    tipo            TEXT NOT NULL CHECK (tipo IN
+                    ('entendi','sorpresa','duda','practicar')),
+    fecha           TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+    PRIMARY KEY (publicacion_id, usuario_id, tipo)
+);
+
+CREATE INDEX IF NOT EXISTS idx_reacciones_publicacion
+    ON publicacion_reacciones(publicacion_id, tipo);
+
 -- ------------------------------------------------------------
 -- ACTIVIDADES
 -- ------------------------------------------------------------

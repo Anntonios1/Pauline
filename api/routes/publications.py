@@ -3,13 +3,16 @@ from api.models import Publicacion, Moderacion
 from api.services.publications import (
     crear_publicacion, listar_publicaciones, obtener_publicacion_por_id,
     obtener_publicacion_por_slug, actualizar_publicacion, moderar_publicacion,
-    listar_historial_moderacion, listar_comentarios_publicacion
+    listar_historial_moderacion, listar_comentarios_publicacion, alternar_reaccion
 )
-from api.config.settings import ALLOWED_ESTADOS_PUBLICACION, ALLOWED_DECISIONES_MODERACION
+from api.config.settings import (
+    ALLOWED_ESTADOS_PUBLICACION, ALLOWED_DECISIONES_MODERACION, ALLOWED_REACCIONES
+)
 from api.utils.helpers import generate_slug
 from api.utils.helpers import now_utc
 from api.utils.upload import compress_and_save_image, UploadError
 from api.routes.auth import get_user_from_token, require_role
+from api.websocket.feed_manager import feed_manager
 from api.services.achievements import evaluar_logros
 from api.services.notifications import crear_notificacion_para_staff
 
@@ -81,7 +84,10 @@ def list_publications(handler, params, query, body):
         if not es_staff and not es_propio_autor:
             return {"error": "No tienes permiso para listar publicaciones en este estado"}, 403
     q = (query.get("q") or query.get("search") or "").strip()[:200] or None
-    return listar_publicaciones(estado=estado, area=area, categoria_id=categoria_id, autor_id=autor_id, q=q)
+    return listar_publicaciones(
+        estado=estado, area=area, categoria_id=categoria_id, autor_id=autor_id, q=q,
+        viewer_id=usuario["id"] if usuario else None,
+    )
 
 
 def _puede_ver_publicacion(handler, pub) -> bool:
@@ -111,7 +117,8 @@ def get_publication(handler, params, query, body):
 
 def get_publication_by_slug(handler, params, query, body):
     slug = params["slug"]
-    pub = obtener_publicacion_por_slug(slug)
+    usuario = get_user_from_token(handler)
+    pub = obtener_publicacion_por_slug(slug, viewer_id=usuario["id"] if usuario else None)
     if not pub:
         return {"error": "Publicacion no encontrada"}, 404
     if not _puede_ver_publicacion(handler, pub):
@@ -203,6 +210,34 @@ def upload_cover_image(handler, params, query, body):
         return {"error": str(e)}, 400
 
 
+def toggle_reaction(handler, params, query, body):
+    """Pone o quita una reaccion del usuario en sesion. Idempotente."""
+    usuario = get_user_from_token(handler)
+    if not usuario:
+        return {"error": "Autenticacion requerida"}, 401
+    publicacion_id = int(params["id"])
+    tipo = (body.get("tipo") or body.get("reaccion") or "").strip()
+    if tipo not in ALLOWED_REACCIONES:
+        return {"error": f"Reaccion invalida. Usa: {', '.join(ALLOWED_REACCIONES)}"}, 400
+
+    pub = obtener_publicacion_por_id(publicacion_id)
+    if not pub:
+        return {"error": "Publicacion no encontrada"}, 404
+    # Solo se reacciona a lo publicado: un borrador ajeno no debe ni confirmarse
+    # que existe, y sobre uno propio todavia no hay nada que compartir.
+    if pub["estado"] != "aprobada":
+        return {"error": "Publicacion no encontrada"}, 404
+
+    resultado = alternar_reaccion(publicacion_id, usuario["id"], tipo)
+    # Avisar a las demas pestanas/dispositivos. Solo viajan conteos de algo ya
+    # aprobado, nunca contenido ni quien reacciono.
+    feed_manager.publicar("reaccion", {
+        "publicacion_id": publicacion_id,
+        "reacciones": resultado["reacciones"],
+    })
+    return resultado
+
+
 routes = [
     (re.compile(r"^/api/publications$"), ["POST"], create_publication),
     (re.compile(r"^/api/publications$"), ["GET"], list_publications),
@@ -212,4 +247,5 @@ routes = [
     (re.compile(r"^/api/publications/(?P<id>\d+)/cover$"), ["POST"], upload_cover_image),
     (re.compile(r"^/api/publications/(?P<id>\d+)/moderate$"), ["POST"], moderate_publication),
     (re.compile(r"^/api/publications/(?P<id>\d+)/moderation$"), ["GET"], get_moderation_history),
+    (re.compile(r"^/api/publications/(?P<id>\d+)/reactions$"), ["POST"], toggle_reaction),
 ]

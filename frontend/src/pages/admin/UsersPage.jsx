@@ -174,7 +174,7 @@ export default function UsersPage() {
                   type="button"
                   onClick={() => handleReset(u)}
                   disabled={resettingId === u.id}
-                  className="press inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-600 hover:border-amber-300 hover:bg-amber-50 hover:text-amber-700 disabled:opacity-50"
+                  className="press inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2.5 sm:py-1.5 text-xs font-bold text-slate-600 hover:border-amber-300 hover:bg-amber-50 hover:text-amber-700 disabled:opacity-50"
                 >
                   <KeyRound size={13} /> {resettingId === u.id ? 'Generando…' : 'Restablecer'}
                 </button>

@@ -21,6 +21,7 @@ from api.routes import routes_registry
 from api.database.connection import init_db
 from api.services.sessions import limpiar_sesiones_expiradas
 from api.utils.upload import open_upload_stream
+from api.websocket.feed_manager import feed_manager
 from api.websocket.room_manager import room_manager
 
 
@@ -227,6 +228,28 @@ async def websocket_room(websocket: WebSocket, room_code: str):
             await room_manager.handle_message(websocket, room_code, msg)
     except WebSocketDisconnect:
         await room_manager.disconnect(websocket, room_code)
+
+
+# ── WebSocket — Avisos del feed ────────────────────────────────────────────────
+@app.websocket("/ws/feed")
+async def websocket_feed(websocket: WebSocket):
+    """Canal de solo lectura: avisa que algo cambio, no manda el contenido.
+
+    Es independiente de /ws/room/{code} (salas de juego) a proposito: aquel tiene
+    estado por partida, este no tiene estado ninguno. El cliente que recibe un
+    aviso recarga por REST con su token, asi los permisos se siguen aplicando en
+    un unico sitio. Ver api/websocket/feed_manager.py.
+    """
+    await feed_manager.connect(websocket)
+    try:
+        while True:
+            # No se espera nada del cliente; recibir mantiene viva la conexion y
+            # es lo que levanta WebSocketDisconnect cuando se va.
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        feed_manager.disconnect(websocket)
+    except Exception:
+        feed_manager.disconnect(websocket)
 
 
 # ── Healthcheck ────────────────────────────────────────────────────────────────

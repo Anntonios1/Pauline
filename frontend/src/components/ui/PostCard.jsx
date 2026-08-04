@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
+import * as api from '../../services/api'
 import { Bookmark, ChevronRight, CheckCircle, HelpCircle, Zap, Star, Trash2, MessageCircle } from 'lucide-react'
 import { publicationStyleClasses, publicationCoverClasses } from '../../utils/publicationStyle'
 
@@ -29,6 +30,26 @@ export default function PostCard({ post, className = '', canModerate = false, on
   const [misReacciones, setMisReacciones] = useState(new Set(post.misReacciones || []))
   const [guardado, setGuardado] = useState(false)
   const [expanded, setExpanded] = useState(false)
+  // Marca las pulsaciones en vuelo: mientras el servidor no confirme, lo que se
+  // ve en pantalla manda sobre lo que llegue del feed.
+  const enviandoRef = useRef(0)
+
+  /* `useState` solo corre al montar. Cuando el aviso del WebSocket recarga el
+     feed y llega un `post` con los conteos de otro dispositivo, hay que
+     copiarlos al estado local o la tarjeta se queda con los de hace un rato —
+     que es justo el "no se actualiza en el otro dispositivo". Se ignora
+     mientras haya una reacción propia sin confirmar, para no ver el contador
+     saltar hacia atrás y volver. */
+  const conteosDelServidor = JSON.stringify(post.reacciones || {})
+  const miasDelServidor = JSON.stringify(post.misReacciones || [])
+  useEffect(() => {
+    if (enviandoRef.current > 0) return
+    setReacciones(post.reacciones || {})
+    setMisReacciones(new Set(post.misReacciones || []))
+    // Se comparan serializados: el objeto es nuevo en cada recarga aunque el
+    // contenido sea idéntico, y compararlo por referencia haría esto inútil.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conteosDelServidor, miasDelServidor])
 
   const tipoConfig = TIPO_CONFIG[post.tipo] || TIPO_CONFIG.lectura
   const isTeacher = post.autor?.rol === 'docente' || post.autor?.rol === 'administrador'
@@ -36,18 +57,37 @@ export default function PostCard({ post, className = '', canModerate = false, on
   const estiloClases = publicationStyleClasses(post.estilo_visual)
   const portadaClases = publicationCoverClasses(post.estilo_visual)
 
-  const handleReaccion = (key) => {
+  const handleReaccion = async (key) => {
+    if (!post.publicacion_id) return
+    // Se pinta al instante y se confirma con el servidor: esperar la respuesta
+    // para mover el botón se siente roto en un móvil con mala conexión.
+    const previoMias = misReacciones
+    const previoConteos = reacciones
     const nuevo = new Set(misReacciones)
-    const newReacciones = { ...reacciones }
+    const optimista = { ...reacciones }
     if (nuevo.has(key)) {
       nuevo.delete(key)
-      newReacciones[key] = Math.max(0, (newReacciones[key] || 1) - 1)
+      optimista[key] = Math.max(0, (optimista[key] || 1) - 1)
     } else {
       nuevo.add(key)
-      newReacciones[key] = (newReacciones[key] || 0) + 1
+      optimista[key] = (optimista[key] || 0) + 1
     }
     setMisReacciones(nuevo)
-    setReacciones(newReacciones)
+    setReacciones(optimista)
+
+    enviandoRef.current += 1
+    try {
+      // La respuesta trae los conteos reales, que pueden diferir de la
+      // estimación si alguien más reaccionó en paralelo.
+      const server = await api.toggleReaction(post.publicacion_id, key)
+      setReacciones(server.reacciones || {})
+      setMisReacciones(new Set(server.mis_reacciones || []))
+    } catch {
+      setMisReacciones(previoMias)
+      setReacciones(previoConteos)
+    } finally {
+      enviandoRef.current -= 1
+    }
   }
 
   const totalReacciones = Object.values(reacciones).reduce((a, b) => a + b, 0)

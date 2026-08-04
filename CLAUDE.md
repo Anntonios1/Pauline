@@ -33,8 +33,13 @@ python api/tests/test_unified_quizzes.py
 python api/tests/test_extended_audit.py
 python api/tests/test_security_regressions.py
 python api/tests/test_media_streaming.py
+python api/tests/test_reactions.py
 python api/tests/test_live.py
 ```
+
+`test_extended_audit.py` imprime `→` y revienta con `UnicodeEncodeError` en la consola de
+Windows (cp1252); no es un fallo del código: `PYTHONIOENCODING=utf-8 python api/tests/test_extended_audit.py`.
+`test_live.py` está roto de antes: apunta a `HTTPSConnection` contra un backend que sirve HTTP.
 
 `test_unified_quizzes.py`, `test_security_regressions.py`, `test_media_streaming.py` y
 `test_avatar_encryption.py` son
@@ -79,6 +84,13 @@ Nothing imports it, so it never reaches the bundle.
 - Auth is a bearer token issued at login and stored server-side in a `sesiones` table (`services/sessions.py`), not JWT. `require_auth(handler)` / `get_user_from_token(handler)` in `routes/auth.py` are the shared guards other route modules import.
 - `api/database/connection.py`'s `init_db()` runs on every app startup: it executes `schema.sql` (idempotent `CREATE TABLE IF NOT EXISTS`) then applies hand-written `ALTER TABLE` / table-rebuild migrations (`_ensure_quiz_columns`, `_ensure_quiz_media_video_support`, `_ensure_room_columns`) for schema changes SQLite's `IF NOT EXISTS` can't express. When changing an existing table's shape, add a similar guarded migration function rather than editing `schema.sql`'s `CREATE TABLE` in a way that breaks existing databases — it never drops data.
 - `blog.db` (SQLite file, repo root) is the live database; `DB_PATH` env var overrides it (tests point it at a temp file per run). `schema.sql` at repo root is the canonical schema.
+- Hay **dos** WebSockets independientes y no hay que mezclarlos. `/ws/feed`
+  (`api/websocket/feed_manager.py`) es un canal sin estado que solo **avisa** que algo cambió
+  (`{event, data}` con ids y conteos, nunca contenido): el cliente recibe el aviso y recarga por
+  REST con su token, así los permisos se siguen resolviendo en las rutas que ya los aplican y no
+  hay riesgo de empujar un borrador. `feed_manager.publicar()` se llama desde código síncrono y
+  agenda con `create_task`, tolerando que no haya event loop (los tests llaman a los handlers
+  directamente) — si lo cambias, mantén ese `try/except RuntimeError` o los tests reventarán.
 - Real-time quiz games run over a WebSocket at `/ws/room/{room_code}`, handled entirely by `api/websocket/room_manager.py` (`RoomManager`/`RoomState`/`PlayerState`) — join/start/answer/next/end message protocol documented in that file's docstring and mirrored in `app.py`'s websocket route docstring. This is unrelated to the REST `routes_registry` dispatch path.
 - Config/constants (allowed areas, publication states, difficulties, moderation decisions, upload MIME allow-lists, rate limiting) live in `api/config/settings.py` — check there before hardcoding a valid-values list elsewhere. Only lists with a real reader live there; roles/question-types/attempt-states are validated inline where they're used.
 - Quiz content has two generations: legacy `preguntas`/`intentos` tables and a newer unified engine (`quizzes`, `quiz_items`, `quiz_opciones`, `quiz_media_assets`, `quiz_versions`, `quiz_respuestas_intento`) — `database/reset_legacy_quizzes.py` and `services/quizzes.py` relate to the migration between them.
@@ -91,5 +103,10 @@ Nothing imports it, so it never reaches the bundle.
 - All backend calls go through `frontend/src/services/api.js` — a single `fetchWithAuth` wrapper (attaches bearer token from `localStorage`, prefixes `/api`, throws on non-OK responses) with one exported function per endpoint. Add new endpoints here rather than calling `fetch` directly from components.
 - The live quiz/game UI is `frontend/src/engines/UnifiedQuiz/` and `frontend/src/engines/GameEngine.jsx`, driven by the `/ws/room/:code` protocol via `WebSocketContext`.
 - Todo lo que pinte medios (imagen/audio/video/PDF/incrustaciones) pasa por `frontend/src/components/media/MediaEngine.jsx`, usado tanto por el reproductor como por la vista previa del creador. Añade tipos ahí, no en cada pantalla.
+- Los componentes que muestran datos del feed (`PostCard`) copian a estado local lo que llega en
+  props, para poder pintar la reacción antes de que responda el servidor. Ese estado **debe
+  resincronizarse con un `useEffect`** cuando cambian las props: `useState(props.x)` solo corre al
+  montar, así que sin él un aviso de `/ws/feed` recarga los datos y la tarjeta sigue mostrando los
+  viejos. Es exactamente el bug de "no se actualiza en el otro dispositivo".
 - En `UnifiedQuiz.jsx` el contador de tiempo es un solo estado `{ key, left }` a propósito: con dos estados separados, al cambiar de bloque el efecto de auto-envío leía el `left` del bloque anterior (un 0 recién expirado) mientras `current` ya era el nuevo, y lo daba por fallado sin dejar responder. Si lo tocas, mantén el valor y su bloque juntos.
 - Dev server (`vite.config.js`) proxies `/api`, `/uploads`, and `/ws` to `http://127.0.0.1:8000` and logs every proxied request/response to the console — the backend must be running for frontend dev to do anything beyond static routing.
