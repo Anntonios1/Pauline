@@ -7,10 +7,11 @@ import { QrCode, CheckCircle, Clock, ShieldAlert, Sparkles } from 'lucide-react'
 
 export default function GameJoinPage() {
   const { code: routeCode } = useParams()
-  const { user, token } = useAuth()
+  const { user, token, loading: authLoading } = useAuth()
   const navigate = useNavigate()
   const {
     connectToRoom,
+    leaveRoom,
     status,
     question,
     questionIndex,
@@ -36,10 +37,14 @@ export default function GameJoinPage() {
   }
 
   useEffect(() => {
-    if (routeCode && token) {
-      connectToRoom(routeCode.toUpperCase(), token, user?.nombre_visible || 'Estudiante')
-    }
-  }, [routeCode, token, connectToRoom, user])
+    // Ver el comentario equivalente en GameRoomPage: esperar a que AuthContext
+    // termine de cargar evita conectar con el nombre de respaldo y reconectar
+    // enseguida con el real.
+    if (!routeCode || !token || authLoading) return
+    connectToRoom(routeCode.toUpperCase(), token, user?.nombre_visible || 'Estudiante')
+    return () => leaveRoom()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- user se lee una sola vez al conectar, no debe disparar reconexión
+  }, [routeCode, token, authLoading, connectToRoom, leaveRoom])
 
   useEffect(() => {
     if (question) {

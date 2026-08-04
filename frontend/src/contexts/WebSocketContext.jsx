@@ -22,9 +22,19 @@ export function WebSocketProvider({ children }) {
   const wsRef = useRef(null)
 
   const connectToRoom = useCallback((roomCode, token, nombre) => {
-    if (wsRef.current) {
-      wsRef.current.close()
+    const actual = wsRef.current
+    // GameRoomPage/GameJoinPage llaman a esto desde un useEffect cuyas deps
+    // incluyen `user`, que pasa de null al objeto real justo después de montar
+    // (AuthContext lo restaura en un efecto propio). Ese cambio de referencia
+    // reejecuta el efecto y llamaría de nuevo aquí para la MISMA sala, cerrando
+    // el socket anterior mientras todavía estaba conectando (el "WebSocket is
+    // closed before the connection is established" del navegador). Si ya hay
+    // una conexión viva o en curso a esta sala con este token, no hay nada que
+    // rehacer.
+    if (actual && actual._roomCode === roomCode && actual._token === token && actual.readyState <= WebSocket.OPEN) {
+      return
     }
+    if (actual) actual.close()
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
     const host = window.location.hostname === 'localhost' ? '127.0.0.1:8000' : `${window.location.hostname}:8000`
@@ -33,14 +43,25 @@ export function WebSocketProvider({ children }) {
     setRoomState(prev => ({ ...prev, status: 'connecting', roomCode, error: null }))
 
     const ws = new WebSocket(wsUrl)
+    ws._roomCode = roomCode
+    ws._token = token
     wsRef.current = ws
 
+    // Cerrar este socket (por una reconexión, o por leaveRoom) no cancela sus
+    // eventos: error/close siguen llegando de forma asíncrona después. Sin
+    // este guard, un socket ya reemplazado podía pisar el estado que puso el
+    // socket nuevo (p.ej. dejar "Error de conexión" pegado aunque la conexión
+    // real ya estuviera abierta) — cada handler solo actúa si sigue siendo el
+    // socket vigente.
+    const esVigente = () => wsRef.current === ws
+
     ws.onopen = () => {
-      // Send join payload with token
+      if (!esVigente()) return
       ws.send(JSON.stringify({ event: 'join', token, nombre }))
     }
 
     ws.onmessage = (event) => {
+      if (!esVigente()) return
       try {
         const msg = JSON.parse(event.data)
         const { event: evtType, data } = msg
@@ -129,10 +150,12 @@ export function WebSocketProvider({ children }) {
     }
 
     ws.onerror = () => {
+      if (!esVigente()) return
       setRoomState(prev => ({ ...prev, status: 'disconnected', error: 'Error de conexión a la sala' }))
     }
 
     ws.onclose = () => {
+      if (!esVigente()) return
       setRoomState(prev => ({ ...prev, status: 'disconnected' }))
     }
 

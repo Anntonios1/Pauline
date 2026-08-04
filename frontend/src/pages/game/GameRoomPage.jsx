@@ -7,10 +7,11 @@ import { QrCode, Play, Users, Sparkles, CheckCircle2, ArrowRight, ShieldAlert } 
 
 export default function GameRoomPage() {
   const { code } = useParams()
-  const { user, token } = useAuth()
+  const { user, token, loading: authLoading } = useAuth()
   const navigate = useNavigate()
   const {
     connectToRoom,
+    leaveRoom,
     status,
     players,
     isDocente,
@@ -30,25 +31,31 @@ export default function GameRoomPage() {
   const [qrError, setQrError] = useState('')
 
   useEffect(() => {
-    if (code && token) {
-      connectToRoom(code, token, user?.nombre_visible || 'Docente')
+    // `user` pasa de null al objeto real justo después de montar (AuthContext
+    // lo restaura en su propio efecto). Esperar a `authLoading === false`
+    // evita conectar una vez con el nombre de respaldo y tener que reconectar
+    // enseguida con el real — un solo intento, ya con los datos correctos.
+    if (!code || !token || authLoading) return
+    connectToRoom(code, token, user?.nombre_visible || 'Docente')
 
-      // Fetch QR desde API
-      fetch(`/api/rooms/${code}/qr`, {
-        headers: { Authorization: `Bearer ${token}` }
+    // Fetch QR desde API
+    fetch(`/api/rooms/${code}/qr`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.join_url) setJoinUrl(data.join_url)
+        if (data.qr_base64) {
+          setQrBase64(data.qr_base64)
+        } else {
+          setQrError(data.error || 'No se pudo generar el código QR.')
+        }
       })
-        .then(res => res.json())
-        .then(data => {
-          if (data.join_url) setJoinUrl(data.join_url)
-          if (data.qr_base64) {
-            setQrBase64(data.qr_base64)
-          } else {
-            setQrError(data.error || 'No se pudo generar el código QR.')
-          }
-        })
-        .catch(() => setQrError('No se pudo cargar el código QR.'))
-    }
-  }, [code, token, connectToRoom, user])
+      .catch(() => setQrError('No se pudo cargar el código QR.'))
+
+    return () => leaveRoom()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- user se lee una sola vez al conectar, no debe disparar reconexión
+  }, [code, token, authLoading, connectToRoom, leaveRoom])
 
   const isPlaying = status === 'playing'
   const isFinished = status === 'finished'
