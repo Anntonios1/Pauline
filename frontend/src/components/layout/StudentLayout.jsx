@@ -5,7 +5,8 @@ import BottomNav from './BottomNav'
 import SideMenu from './SideMenu'
 import { useAuth } from '../../contexts/AuthContext'
 import { useData } from '../../contexts/DataContext'
-import { Plus, Map as MapIcon, BarChart3, BookOpen, Compass, CalendarDays, Clock3, MapPin } from 'lucide-react'
+import { useLearningPath } from '../../hooks/useLearningPath'
+import { Plus, Map as MapIcon, BarChart3, BookOpen, Compass, CalendarDays, Clock3, MapPin, CheckCircle, Play, Circle } from 'lucide-react'
 import { useLocation } from 'react-router-dom'
 import * as api from '../../services/api'
 
@@ -23,10 +24,14 @@ export default function StudentLayout() {
   const location = useLocation()
   const navigate = useNavigate()
   const { user } = useAuth()
-  const { progress } = useData()
+  const { progress, logros } = useData()
+  const { learningPath } = useLearningPath()
   const attempted = progress.filter(item => Number(item.total_intentos || 0) > 0).length
   const perfect = progress.filter(item => Number(item.mejor_porcentaje) === 100).length
   const profileRank = perfect >= 5 ? 'diamante' : perfect >= 3 ? 'oro' : attempted >= 3 ? 'plata' : 'bronce'
+  const primeraUnidadActiva = learningPath.findIndex(u => !u.todosCompletados)
+  const unidadesWidget = learningPath.slice(0, 3)
+  const obtenidos = logros.filter(l => l.obtenido)
   const [classEvents, setClassEvents] = useState([])
   useEffect(() => { api.getClassEvents().then(setClassEvents).catch(() => setClassEvents([])) }, [])
   const nextEvent = classEvents[0]
@@ -94,21 +99,62 @@ export default function StudentLayout() {
                 Mi ruta
               </h4>
               <div className="space-y-2">
-                <div className="flex items-center gap-2 text-sm">
-                  <span className="text-green-500 text-base">✅</span>
-                  <span className="text-slate-500 line-through text-xs">Unidad 1: Mi cuerpo</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <span className="text-[color:var(--ar-primary)] text-base">▶️</span>
-                  <span className="font-semibold text-slate-900 text-xs">Unidad 2: La pubertad</span>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <span className="text-slate-300 text-base">🔒</span>
-                  <span className="text-slate-400 text-xs">Unidad 3: Sistemas</span>
-                </div>
+                {unidadesWidget.map((unidad, i) => {
+                  const esActiva = i === primeraUnidadActiva
+                  return (
+                    <div key={unidad.id} className="flex items-center gap-2 text-sm">
+                      {unidad.todosCompletados
+                        ? <CheckCircle size={16} className="text-green-500 flex-shrink-0" />
+                        : esActiva
+                          ? <Play size={16} className="text-[color:var(--ar-primary)] flex-shrink-0" />
+                          : <Circle size={16} className="text-slate-300 flex-shrink-0" />}
+                      <span className={
+                        unidad.todosCompletados
+                          ? 'text-slate-500 line-through text-xs'
+                          : esActiva
+                            ? 'font-semibold text-slate-900 text-xs'
+                            : 'text-slate-400 text-xs'
+                      }>
+                        {unidad.titulo}
+                      </span>
+                    </div>
+                  )
+                })}
+                {unidadesWidget.length === 0 && (
+                  <p className="text-xs text-[color:var(--ar-muted)]">Todavía no hay unidades publicadas.</p>
+                )}
               </div>
               <button onClick={() => navigate('/mi-ruta')} className="mt-3 text-xs font-bold text-[color:var(--ar-primary)] hover:underline">
                 Ver ruta completa →
+              </button>
+            </div>
+
+            {/* Emblemas / logros */}
+            <div className="ar-card p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h4 className="font-bold text-slate-900 flex items-center gap-2">
+                  <span className="text-base">🏅</span>
+                  Mis emblemas
+                </h4>
+                <span className="text-xs font-bold text-[color:var(--ar-muted)]">{obtenidos.length}/{logros.length}</span>
+              </div>
+              {logros.length === 0 ? (
+                <p className="text-xs text-[color:var(--ar-muted)]">Completa actividades para desbloquear emblemas.</p>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {logros.slice(0, 8).map(l => (
+                    <span
+                      key={l.id}
+                      title={`${l.nombre}${l.obtenido ? '' : ' (bloqueado)'}`}
+                      className={`w-9 h-9 rounded-full flex items-center justify-center text-lg bg-[color:var(--ar-primary-light)] ${l.obtenido ? '' : 'opacity-30 grayscale'}`}
+                    >
+                      {l.icono}
+                    </span>
+                  ))}
+                </div>
+              )}
+              <button onClick={() => navigate('/perfil')} className="mt-3 text-xs font-bold text-[color:var(--ar-primary)] hover:underline">
+                Ver todos los emblemas →
               </button>
             </div>
 

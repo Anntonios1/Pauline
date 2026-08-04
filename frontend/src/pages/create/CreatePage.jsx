@@ -3,8 +3,9 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { useData } from '../../contexts/DataContext'
 import * as api from '../../services/api'
-import { ChevronLeft, ChevronRight, Send, X, CheckCircle, AlertCircle, Image as ImageIcon, Loader } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Send, X, CheckCircle, AlertCircle, Image as ImageIcon, Loader, Paperclip } from 'lucide-react'
 import PublicationStylePicker from '../../components/publications/PublicationStylePicker'
+import ResourcePicker from '../../components/resources/ResourcePicker'
 
 /* ---- Paso 1: Propósito ---- */
 const PROPOSITOS = [
@@ -70,10 +71,18 @@ export default function CreatePage() {
   const [imageError, setImageError] = useState('')
   const [imageUploadWarning, setImageUploadWarning] = useState('')
   const [estiloVisual, setEstiloVisual] = useState({ acento: 'turquesa', patron: 'liso' })
+  const [recursosSeleccionados, setRecursosSeleccionados] = useState([])
   const [enviado, setEnviado] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const [resourceWarning, setResourceWarning] = useState('')
   const fileInputRef = useRef(null)
+
+  const agregarRecurso = (recurso) => {
+    if (recursosSeleccionados.some(r => r.id === recurso.id)) return
+    setRecursosSeleccionados(prev => [...prev, recurso])
+  }
+  const quitarRecurso = (id) => setRecursosSeleccionados(prev => prev.filter(r => r.id !== id))
 
   const canNext = () => {
     if (step === 1) return !!proposito
@@ -159,6 +168,20 @@ export default function CreatePage() {
         }
       }
 
+      if (pubId && recursosSeleccionados.length > 0) {
+        const fallidos = []
+        for (const [i, recurso] of recursosSeleccionados.entries()) {
+          try {
+            await api.addResourceToPublication(pubId, recurso.id, i + 1)
+          } catch {
+            fallidos.push(recurso.titulo)
+          }
+        }
+        if (fallidos.length > 0) {
+          setResourceWarning(`No se pudieron adjuntar estos recursos: ${fallidos.join(', ')}`)
+        }
+      }
+
       // Refrescar la data global para que aparezca en moderación / perfil
       try { await refresh() } catch {}
 
@@ -189,6 +212,11 @@ export default function CreatePage() {
         {imageUploadWarning && (
           <div className="mt-4 max-w-sm rounded-xl border border-yellow-200 bg-yellow-50 p-3 text-left">
             <p className="text-xs font-semibold text-yellow-800">{imageUploadWarning}</p>
+          </div>
+        )}
+        {resourceWarning && (
+          <div className="mt-4 max-w-sm rounded-xl border border-yellow-200 bg-yellow-50 p-3 text-left">
+            <p className="text-xs font-semibold text-yellow-800">{resourceWarning}</p>
           </div>
         )}
         <p className="text-xs text-[color:var(--ar-subtle)] mt-4">Regresando…</p>
@@ -386,6 +414,31 @@ export default function CreatePage() {
             <p className="mb-3 text-sm font-extrabold text-slate-700">Apariencia de tu publicación</p>
             <PublicationStylePicker value={estiloVisual} onChange={setEstiloVisual} />
           </div>
+
+          {isTeacher && (
+            <div className="rounded-2xl border border-[color:var(--ar-border)] p-4">
+              <label className="block text-sm font-extrabold text-slate-700 mb-1.5 flex items-center gap-1.5">
+                <Paperclip size={15} />
+                Adjuntar recursos existentes <span className="font-normal text-[color:var(--ar-muted)]">(opcional)</span>
+              </label>
+              <p className="text-xs text-[color:var(--ar-muted)] mb-2">
+                Reutiliza material ya subido a tu biblioteca en vez de volver a subirlo.
+              </p>
+              {recursosSeleccionados.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {recursosSeleccionados.map(r => (
+                    <span key={r.id} className="inline-flex items-center gap-1.5 rounded-full bg-[color:var(--ar-primary-light)] px-3 py-1.5 text-xs font-bold text-[color:var(--ar-primary-dark)]">
+                      {r.titulo}
+                      <button type="button" onClick={() => quitarRecurso(r.id)} aria-label="Quitar recurso">
+                        <X size={12} />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              <ResourcePicker onSelect={agregarRecurso} excludeIds={recursosSeleccionados.map(r => r.id)} />
+            </div>
+          )}
         </section>
       )}
 
@@ -473,6 +526,12 @@ export default function CreatePage() {
               <div className="flex justify-between text-sm">
                 <span className="text-[color:var(--ar-muted)] font-semibold">Imagen</span>
                 <span className="font-bold text-green-600">Included ✓</span>
+              </div>
+            )}
+            {recursosSeleccionados.length > 0 && (
+              <div className="flex justify-between text-sm">
+                <span className="text-[color:var(--ar-muted)] font-semibold">Recursos adjuntos</span>
+                <span className="font-bold text-green-600">{recursosSeleccionados.length}</span>
               </div>
             )}
           </div>

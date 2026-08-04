@@ -189,6 +189,28 @@ export async function rejectResource(id) {
   return fetchWithAuth(`/resources/${id}/reject`, { method: 'POST' })
 }
 
+export async function getPublicationResources(publicationId) {
+  return fetchWithAuth(`/publications/${publicationId}/resources`)
+}
+
+export async function addResourceToPublication(publicationId, recursoId, orden = 1) {
+  return fetchWithAuth(`/publications/${publicationId}/resources`, {
+    method: 'POST',
+    body: JSON.stringify({ recurso_id: recursoId, orden }),
+  })
+}
+
+export async function getActivityResources(activityId) {
+  return fetchWithAuth(`/activities/${activityId}/resources`)
+}
+
+export async function addResourceToActivity(activityId, recursoId, orden = 1) {
+  return fetchWithAuth(`/activities/${activityId}/resources`, {
+    method: 'POST',
+    body: JSON.stringify({ recurso_id: recursoId, orden }),
+  })
+}
+
 export async function updateMyProfile(data) {
   return fetchWithAuth('/users/me', {
     method: 'PUT',

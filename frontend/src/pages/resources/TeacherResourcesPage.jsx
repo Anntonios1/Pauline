@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { FileAudio, FileImage, FileText, Film, FolderPlus, Link as LinkIcon, Upload } from 'lucide-react'
+import { FileAudio, FileImage, FileText, Film, FolderPlus, Link as LinkIcon, Recycle, Upload } from 'lucide-react'
 import { useAuth } from '../../contexts/AuthContext'
+import { useData } from '../../contexts/DataContext'
 import * as api from '../../services/api'
 
 const TYPES = [
@@ -10,12 +11,17 @@ const TYPES = [
 
 export default function TeacherResourcesPage() {
   const { user } = useAuth()
+  const { publications, activities } = useData()
   const inputRef = useRef(null)
   const [resources, setResources] = useState([])
   const [form, setForm] = useState({ titulo: '', descripcion: '', tipo: 'pdf', url: '', area: 'preguntas_frecuentes' })
   const [file, setFile] = useState(null)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
+  const [reuseFor, setReuseFor] = useState(null)
+  const [reuseTipo, setReuseTipo] = useState('publicacion')
+  const [reuseTargetId, setReuseTargetId] = useState('')
+  const [reuseMsg, setReuseMsg] = useState({})
 
   const load = () => {
     if (user?.id) api.getResources({ subido_por: user.id, estado: '', activos: 'false' }).then(setResources).catch(() => setMessage('No se pudieron cargar tus recursos.'))
@@ -40,6 +46,23 @@ export default function TeacherResourcesPage() {
     } catch (error) { setMessage(error.message || 'No se pudo guardar el recurso.') } finally { setSaving(false) }
   }
 
+  const openReuse = (resourceId) => {
+    setReuseFor(resourceId); setReuseTipo('publicacion'); setReuseTargetId('')
+    setReuseMsg(prev => ({ ...prev, [resourceId]: '' }))
+  }
+
+  const confirmReuse = async (resourceId) => {
+    if (!reuseTargetId) return
+    try {
+      if (reuseTipo === 'publicacion') await api.addResourceToPublication(reuseTargetId, resourceId)
+      else await api.addResourceToActivity(reuseTargetId, resourceId)
+      setReuseMsg(prev => ({ ...prev, [resourceId]: '✓ Recurso adjuntado.' }))
+      setReuseFor(null)
+    } catch (error) {
+      setReuseMsg(prev => ({ ...prev, [resourceId]: error.message || 'No se pudo adjuntar.' }))
+    }
+  }
+
   return <div className="mx-auto max-w-5xl space-y-5 pb-6">
     <section className="rounded-3xl bg-gradient-to-br from-amber-500 to-orange-600 p-6 text-white"><div className="flex items-center gap-3"><FolderPlus size={30} /><div><h1 className="text-2xl font-black">Biblioteca docente</h1><p className="text-sm text-white/85">Reúne materiales reutilizables para lecturas y quizzes.</p></div></div></section>
     <form onSubmit={submit} className="grid gap-4 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-slate-100 md:grid-cols-2">
@@ -52,6 +75,63 @@ export default function TeacherResourcesPage() {
       <button disabled={saving} className="md:col-span-2 flex items-center justify-center gap-2 rounded-xl bg-orange-600 px-4 py-3 font-bold text-white disabled:opacity-60"><Upload size={18} />{saving ? 'Guardando…' : 'Guardar en mi biblioteca'}</button>
       {message && <p className="md:col-span-2 rounded-xl bg-slate-50 p-3 text-sm font-semibold text-slate-700">{message}</p>}
     </form>
-    <section><h2 className="mb-3 font-extrabold text-slate-900">Mis recursos ({resources.length})</h2><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{resources.map(resource => { const type = TYPES.find(item => item.value === resource.tipo); const Icon = type?.icon || LinkIcon; return <a key={resource.id} href={resource.archivo_o_url} target="_blank" rel="noreferrer" className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-100 transition hover:-translate-y-0.5 hover:shadow-md"><Icon className="mb-3 text-orange-500" size={24} /><p className="font-extrabold text-slate-900">{resource.titulo}</p><p className="mt-1 text-sm text-slate-500 line-clamp-2">{resource.descripcion || type?.label || 'Recurso'}</p></a> })}</div>{resources.length === 0 && <p className="rounded-2xl bg-white p-6 text-center text-slate-500">Aún no tienes recursos en tu biblioteca.</p>}</section>
+    <section>
+      <h2 className="mb-3 font-extrabold text-slate-900">Mis recursos ({resources.length})</h2>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {resources.map(resource => {
+          const type = TYPES.find(item => item.value === resource.tipo)
+          const Icon = type?.icon || LinkIcon
+          const targets = reuseTipo === 'publicacion' ? publications : activities
+          return (
+            <div key={resource.id} className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-100 transition hover:shadow-md">
+              <a href={resource.archivo_o_url} target="_blank" rel="noreferrer" className="block">
+                <Icon className="mb-3 text-orange-500" size={24} />
+                <p className="font-extrabold text-slate-900">{resource.titulo}</p>
+                <p className="mt-1 text-sm text-slate-500 line-clamp-2">{resource.descripcion || type?.label || 'Recurso'}</p>
+              </a>
+              <button
+                type="button"
+                onClick={() => reuseFor === resource.id ? setReuseFor(null) : openReuse(resource.id)}
+                className="mt-3 flex items-center gap-1.5 text-xs font-bold text-orange-600 hover:underline"
+              >
+                <Recycle size={14} /> Reutilizar en…
+              </button>
+              {reuseFor === resource.id && (
+                <div className="mt-2 space-y-2 rounded-xl bg-slate-50 p-3">
+                  <div className="flex gap-1.5">
+                    <button type="button" onClick={() => { setReuseTipo('publicacion'); setReuseTargetId('') }}
+                      className={`flex-1 rounded-lg px-2 py-1.5 text-xs font-bold ${reuseTipo === 'publicacion' ? 'bg-orange-600 text-white' : 'bg-white text-slate-600'}`}>
+                      Publicación
+                    </button>
+                    <button type="button" onClick={() => { setReuseTipo('actividad'); setReuseTargetId('') }}
+                      className={`flex-1 rounded-lg px-2 py-1.5 text-xs font-bold ${reuseTipo === 'actividad' ? 'bg-orange-600 text-white' : 'bg-white text-slate-600'}`}>
+                      Actividad
+                    </button>
+                  </div>
+                  <select
+                    value={reuseTargetId}
+                    onChange={e => setReuseTargetId(e.target.value)}
+                    className="w-full rounded-lg border border-slate-200 p-2 text-xs font-semibold"
+                  >
+                    <option value="">Selecciona {reuseTipo === 'publicacion' ? 'una publicación' : 'una actividad'}…</option>
+                    {targets.map(t => <option key={t.id} value={t.id}>{t.titulo}</option>)}
+                  </select>
+                  <button
+                    type="button"
+                    disabled={!reuseTargetId}
+                    onClick={() => confirmReuse(resource.id)}
+                    className="w-full rounded-lg bg-orange-600 py-1.5 text-xs font-bold text-white disabled:opacity-50"
+                  >
+                    Adjuntar recurso
+                  </button>
+                </div>
+              )}
+              {reuseMsg[resource.id] && <p className="mt-2 text-xs font-semibold text-slate-600">{reuseMsg[resource.id]}</p>}
+            </div>
+          )
+        })}
+      </div>
+      {resources.length === 0 && <p className="rounded-2xl bg-white p-6 text-center text-slate-500">Aún no tienes recursos en tu biblioteca.</p>}
+    </section>
   </div>
 }
