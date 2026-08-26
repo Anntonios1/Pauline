@@ -32,6 +32,8 @@ def init_db(path: Optional[str] = None) -> None:
         _ensure_publication_style_column(conn)
         _ensure_event_columns(conn)
         _ensure_quiz_privacy_column(conn)
+        _ensure_categoria_orden_column(conn)
+        _ensure_actividad_motor_column(conn)
         conn.commit()
     finally:
         close_db(conn)
@@ -126,6 +128,40 @@ def _ensure_quiz_privacy_column(conn: sqlite3.Connection) -> None:
         return
     if "privado" not in _column_names(conn, "quizzes"):
         conn.execute("ALTER TABLE quizzes ADD COLUMN privado INTEGER NOT NULL DEFAULT 0 CHECK (privado IN (0,1))")
+
+
+def _ensure_categoria_orden_column(conn: sqlite3.Connection) -> None:
+    """Orden de los modulos en "Mi Ruta". No puede llevar un DEFAULT no
+    constante en el ALTER, así que se agrega sin default y se rellena aparte
+    con un orden determinista (por id ascendente) para bases ya existentes."""
+    tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
+    if "categorias" not in tables:
+        return
+    if "orden" not in _column_names(conn, "categorias"):
+        conn.execute("ALTER TABLE categorias ADD COLUMN orden INTEGER")
+        conn.execute("""
+            UPDATE categorias SET orden = (
+                SELECT COUNT(*) FROM categorias c2 WHERE c2.id <= categorias.id
+            ) WHERE orden IS NULL
+        """)
+
+
+def _ensure_actividad_motor_column(conn: sqlite3.Connection) -> None:
+    """Marca explícita de qué motor de preguntas usa una actividad, en vez de
+    inferirlo por la presencia de una fila en `quizzes` en cada lectura."""
+    tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
+    if "actividades" not in tables:
+        return
+    if "motor_quiz" not in _column_names(conn, "actividades"):
+        conn.execute(
+            "ALTER TABLE actividades ADD COLUMN motor_quiz TEXT NOT NULL DEFAULT 'legacy' "
+            "CHECK (motor_quiz IN ('legacy','unificado'))"
+        )
+        if "quizzes" in tables:
+            conn.execute(
+                "UPDATE actividades SET motor_quiz = 'unificado' "
+                "WHERE id IN (SELECT actividad_id FROM quizzes)"
+            )
 
 
 def list_to_dicts(rows: list) -> list:

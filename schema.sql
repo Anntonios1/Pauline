@@ -121,6 +121,9 @@ CREATE TABLE IF NOT EXISTS categorias (
                          'autocuidado',
                          'preguntas_frecuentes')),
     activa              INTEGER NOT NULL DEFAULT 1 CHECK (activa IN (0,1)),
+    -- Orden del modulo dentro de "Mi Ruta" (menor primero). No afecta al feed,
+    -- que sigue ordenando por fecha; ver ruta_pasos.
+    orden               INTEGER NOT NULL DEFAULT 0,
     fecha_creacion      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
     fecha_actualizacion TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
     UNIQUE (nombre, area)
@@ -274,6 +277,10 @@ CREATE TABLE IF NOT EXISTS actividades (
     intentos_maximos      INTEGER NOT NULL DEFAULT 1 CHECK (intentos_maximos > 0),
     creado_por            INTEGER REFERENCES usuarios(id) ON DELETE SET NULL,
     activa                INTEGER NOT NULL DEFAULT 1 CHECK (activa IN (0,1)),
+    -- Distingue el motor de preguntas real de la actividad: 'legacy' (tabla
+    -- preguntas) o 'unificado' (quiz_items). Evita tener que inferirlo por la
+    -- presencia de una fila en quizzes en cada lectura (ver get_activity).
+    motor_quiz            TEXT NOT NULL DEFAULT 'legacy' CHECK (motor_quiz IN ('legacy','unificado')),
     fecha_creacion        TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
     fecha_actualizacion   TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
 );
@@ -721,6 +728,52 @@ CREATE TABLE IF NOT EXISTS quiz_attempt_events (
 
 CREATE INDEX IF NOT EXISTS idx_quiz_attempt_events_intento
     ON quiz_attempt_events(intento_id, fecha);
+
+-- ============================================================
+-- MI RUTA — pasos curados de una ruta de aprendizaje
+--
+-- Una publicacion/actividad sin fila aqui sigue siendo visible en el feed
+-- con normalidad: esta tabla es lo unico que distingue "contenido curado de
+-- una ruta" de "contenido libre de feed". El orden y el desbloqueo
+-- secuencial se resuelven en api/services/learning_path.py a partir de
+-- (categorias.orden, ruta_pasos.orden) + intentos/eventos_aprendizaje, no
+-- se persiste ningun estado de progreso aqui.
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS ruta_pasos (
+    id                  INTEGER PRIMARY KEY,
+    categoria_id        INTEGER NOT NULL REFERENCES categorias(id) ON DELETE CASCADE,
+    orden               INTEGER NOT NULL CHECK (orden > 0),
+    tipo_paso           TEXT NOT NULL CHECK (tipo_paso IN ('publicacion','actividad')),
+    publicacion_id      INTEGER UNIQUE REFERENCES publicaciones(id) ON DELETE CASCADE,
+    actividad_id        INTEGER UNIQUE REFERENCES actividades(id) ON DELETE CASCADE,
+    obligatorio         INTEGER NOT NULL DEFAULT 1 CHECK (obligatorio IN (0,1)),
+    activo              INTEGER NOT NULL DEFAULT 1 CHECK (activo IN (0,1)),
+    creado_por          INTEGER REFERENCES usuarios(id) ON DELETE SET NULL,
+    fecha_creacion      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+    fecha_actualizacion TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+    CHECK (
+        (tipo_paso = 'publicacion' AND publicacion_id IS NOT NULL AND actividad_id IS NULL) OR
+        (tipo_paso = 'actividad'   AND actividad_id   IS NOT NULL AND publicacion_id IS NULL)
+    ),
+    UNIQUE (categoria_id, orden)
+);
+
+CREATE INDEX IF NOT EXISTS idx_ruta_pasos_categoria ON ruta_pasos(categoria_id, orden);
+
+-- ============================================================
+-- CONFIGURACION GLOBAL
+--
+-- Fila unica por clave (ej. 'feed_banner'), valor JSON libre para poder
+-- agregar ajustes de apariencia institucional sin nuevas migraciones.
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS configuracion_global (
+    clave               TEXT PRIMARY KEY,
+    valor               TEXT NOT NULL CHECK (json_valid(valor)),
+    actualizado_por     INTEGER REFERENCES usuarios(id) ON DELETE SET NULL,
+    fecha_actualizacion TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
 
 -- ============================================================
 -- NOTIFICACIONES

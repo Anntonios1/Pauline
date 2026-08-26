@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import * as api from '../../services/api'
 import { Bookmark, ChevronRight, CheckCircle, HelpCircle, Zap, Star, Trash2, MessageCircle } from 'lucide-react'
 import { publicationStyleClasses, publicationCoverClasses } from '../../utils/publicationStyle'
+import ImageViewer from '../media/ImageViewer'
 
 const TIPO_CONFIG = {
   lectura:    { label: '📖 Lectura',    cls: 'badge-lectura' },
@@ -30,6 +31,7 @@ export default function PostCard({ post, className = '', canModerate = false, on
   const [misReacciones, setMisReacciones] = useState(new Set(post.misReacciones || []))
   const [guardado, setGuardado] = useState(false)
   const [expanded, setExpanded] = useState(false)
+  const [imagenAmpliada, setImagenAmpliada] = useState(false)
   // Marca las pulsaciones en vuelo: mientras el servidor no confirme, lo que se
   // ve en pantalla manda sobre lo que llegue del feed.
   const enviandoRef = useRef(0)
@@ -167,11 +169,38 @@ export default function PostCard({ post, className = '', canModerate = false, on
           </button>
         )}
 
+        {/* Etiquetas — ortogonales a la categoría, no la reemplazan */}
+        {post.etiquetas?.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mt-2">
+            {post.etiquetas.map(etiqueta => (
+              <span
+                key={etiqueta.id}
+                className="rounded-full bg-[color:var(--ar-primary-light)] px-2.5 py-0.5 text-[11px] font-bold text-[color:var(--ar-primary-dark)]"
+              >
+                {etiqueta.nombre}
+              </span>
+            ))}
+          </div>
+        )}
+
         {/* Imagen */}
         {post.imagen && (
-          <div className="mt-3 rounded-xl overflow-hidden bg-slate-100" style={{ maxHeight: 280 }}>
+          <button
+            type="button"
+            onClick={() => setImagenAmpliada(true)}
+            className="mt-3 block w-full cursor-zoom-in rounded-xl overflow-hidden bg-slate-100"
+            style={{ maxHeight: 280 }}
+            aria-label="Ampliar imagen de la publicación"
+          >
             <img src={post.imagen} alt="Imagen de la publicación" className="w-full object-cover" />
-          </div>
+          </button>
+        )}
+        {imagenAmpliada && (
+          <ImageViewer
+            url={post.imagen}
+            alt={post.titulo || 'Imagen de la publicación'}
+            onClose={() => setImagenAmpliada(false)}
+          />
         )}
 
         {/* Total reacciones */}

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useData } from '../../contexts/DataContext'
 import PostCard from '../../components/ui/PostCard'
@@ -16,7 +16,12 @@ export default function FeedPage() {
   const { publications, activities, progress, refresh, loading } = useData()
   const [filter, setFilter] = useState('todos')
   const [actionError, setActionError] = useState('')
+  const [banner, setBanner] = useState(null)
   const isTeacher = ['docente', 'administrador'].includes(user?.rol)
+
+  useEffect(() => {
+    api.getFeedBanner().then(setBanner).catch(() => {})
+  }, [])
 
   const filters = [
     { key: 'todos',      label: 'Todo' },
@@ -69,6 +74,17 @@ export default function FeedPage() {
 
   return (
     <div className="feed-container pb-4 fade-in">
+
+      {/* Banner institucional: alto reducido en móvil, no un 33vh fijo. */}
+      {banner?.active && banner.image_url && (
+        <div className="mb-4 overflow-hidden rounded-2xl">
+          <img
+            src={banner.image_url}
+            alt=""
+            className="h-32 w-full object-cover sm:h-48 lg:h-[32vh]"
+          />
+        </div>
+      )}
 
       {/* Saludo personalizado (solo móvil, desktop usa sidebar) */}
       <div className="md:hidden mb-3">

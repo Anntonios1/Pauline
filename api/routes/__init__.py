@@ -17,6 +17,9 @@ from api.routes.class_events import routes as class_events_routes
 from api.routes.achievements import routes as achievements_routes
 from api.routes.notifications import routes as notifications_routes
 from api.routes.research import routes as research_routes
+from api.routes.learning_path import routes as learning_path_routes
+from api.routes.tags import routes as tags_routes
+from api.routes.settings import routes as settings_routes
 
 routes_registry = []
 routes_registry.extend(auth_routes)
@@ -38,5 +41,8 @@ routes_registry.extend(class_events_routes)
 routes_registry.extend(achievements_routes)
 routes_registry.extend(notifications_routes)
 routes_registry.extend(research_routes)
+routes_registry.extend(learning_path_routes)
+routes_registry.extend(tags_routes)
+routes_registry.extend(settings_routes)
 
 __all__ = ["routes_registry"]

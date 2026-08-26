@@ -54,6 +54,7 @@ export function publicationToPost(pub) {
     comentario_destacado: pub.comentario_destacado || null,
     comentario_autor: pub.comentario_autor || null,
     estilo_visual: pub.estilo_visual || null,
+    etiquetas: pub.etiquetas || [],
     destacada: false,
   }
 }

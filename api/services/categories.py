@@ -32,7 +32,7 @@ def listar_categorias(area: str = None, activas: bool = True) -> list:
             params.append(area)
         if condiciones:
             query += " WHERE " + " AND ".join(condiciones)
-        cursor = conn.execute(query + " ORDER BY area, nombre", params)
+        cursor = conn.execute(query + " ORDER BY orden, area, nombre", params)
         return list_to_dicts(cursor.fetchall())
     finally:
         close_db(conn)
@@ -53,7 +53,7 @@ def actualizar_categoria(categoria_id: int, datos: dict) -> dict:
     try:
         campos = []
         valores = []
-        for campo in ["nombre", "slug", "descripcion", "area", "activa"]:
+        for campo in ["nombre", "slug", "descripcion", "area", "activa", "orden"]:
             if campo in datos:
                 campos.append(f"{campo} = ?")
                 valores.append(datos[campo])

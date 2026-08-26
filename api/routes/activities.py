@@ -60,16 +60,17 @@ def get_activity(handler, params, query, body):
     actividad = obtener_actividad_por_id(actividad_id)
     if not actividad:
         return {"error": "Actividad no encontrada"}, 404
-    from api.routes.questions import puede_ver_respuestas, sin_respuestas
-    preguntas_legacy = listar_preguntas_por_actividad(actividad_id)
-    if not puede_ver_respuestas(get_user_from_token(handler)):
-        preguntas_legacy = [sin_respuestas(p) for p in preguntas_legacy]
-    actividad["preguntas"] = preguntas_legacy
-    actividad["recursos"] = listar_recursos_actividad(actividad_id)
-    # El motor nuevo convive con preguntas legacy durante la migración.
-    from api.services.quizzes import obtener_quiz_meta, obtener_quiz_por_actividad
-    meta = obtener_quiz_meta(actividad_id)
-    if meta:
+
+    # `motor_quiz` dice de forma explícita qué motor de preguntas usa esta
+    # actividad — evita tener que inferirlo leyendo primero el legacy y
+    # luego intentando sobreescribirlo si existe una fila en `quizzes`
+    # (la heurística anterior podía devolver 404 después de ya haber hecho
+    # ese trabajo de más).
+    if actividad.get("motor_quiz") == "unificado":
+        from api.services.quizzes import obtener_quiz_meta, obtener_quiz_por_actividad
+        meta = obtener_quiz_meta(actividad_id)
+        if not meta:
+            return {"error": "Actividad no encontrada"}, 404
         user = get_user_from_token(handler)
         can_manage = bool(user) and (
             user["rol"] == "administrador" or meta["creado_por"] == user["id"]
@@ -82,6 +83,14 @@ def get_activity(handler, params, query, body):
         actividad["quiz_version"] = quiz["quiz_version"]
         actividad["items"] = quiz["items"]
         actividad["preguntas"] = quiz["items"]
+    else:
+        from api.routes.questions import puede_ver_respuestas, sin_respuestas
+        preguntas_legacy = listar_preguntas_por_actividad(actividad_id)
+        if not puede_ver_respuestas(get_user_from_token(handler)):
+            preguntas_legacy = [sin_respuestas(p) for p in preguntas_legacy]
+        actividad["preguntas"] = preguntas_legacy
+
+    actividad["recursos"] = listar_recursos_actividad(actividad_id)
     return actividad
 
 
@@ -141,15 +150,9 @@ def get_activities_by_area(handler, params, query, body):
     return buscar_actividades_por_area(area)
 
 
-def get_learning_path(handler, params, query, body):
-    from api.services.activities import obtener_ruta_aprendizaje
-    return obtener_ruta_aprendizaje()
-
-
 routes = [
     (re.compile(r"^/api/activities$"), ["POST"], create_activity),
     (re.compile(r"^/api/activities$"), ["GET"], list_activities),
-    (re.compile(r"^/api/learning-path$"), ["GET"], get_learning_path),
     (re.compile(r"^/api/activities/(?P<id>\d+)$"), ["GET"], get_activity),
     (re.compile(r"^/api/activities/(?P<id>\d+)$"), ["PUT", "PATCH"], update_activity),
     (re.compile(r"^/api/activities/(?P<id>\d+)$"), ["DELETE"], delete_activity),

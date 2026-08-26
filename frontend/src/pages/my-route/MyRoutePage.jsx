@@ -1,55 +1,38 @@
-import { useAuth } from '../../contexts/AuthContext'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useData } from '../../contexts/DataContext'
-import { useReadPublicationIds } from '../../hooks/useMyPublications'
-import { CheckCircle, Lock, Play, ChevronRight, Star, BookOpen, ClipboardList } from 'lucide-react'
-
-function calculateOverall(progress) {
-  if (!progress?.length) return 0
-  const done = progress.filter(p => p.mejor_porcentaje === 100).length
-  return Math.round((done / progress.length) * 100)
-}
+import * as api from '../../services/api'
+import { CheckCircle, Lock, Play } from 'lucide-react'
+import { LoadingState } from '../../components/ui'
+import ActivityPreview from '../../components/media/ActivityPreview'
 
 export default function MyRoutePage() {
-  const { user } = useAuth()
   const navigate = useNavigate()
-  const { progress, categories, publications, activities, logros } = useData()
-  const readIds = useReadPublicationIds()
-  const overall = calculateOverall(progress)
+  const { logros } = useData()
+  const [modulos, setModulos] = useState(null)
+  const [error, setError] = useState('')
 
-  const learningPath = categories.map((cat, ui) => {
-    const lecturas = publications.filter(p => p.categoria_id === cat.id)
-    const act = activities.filter(a => a.categoria_id === cat.id)
-    const pasos = [
-      ...lecturas.map(pub => ({
-        id: `pub-${pub.id}`,
-        titulo: pub.titulo,
-        tipo: 'lectura',
-        slug: pub.slug,
-        estado: readIds.has(pub.id) ? 'completado' : 'activo',
-      })),
-      ...act.map(a => {
-        const prog = progress.find(p => Number(p.id) === Number(a.id))
-        return {
-          id: `act-${a.id}`,
-          titulo: a.titulo,
-          tipo: 'actividad',
-          actividad_id: a.id,
-          estado: prog?.mejor_porcentaje === 100 ? 'completado' : 'activo',
-        }
-      }),
-    ]
-    const completados = pasos.filter(p => p.estado === 'completado').length
-    const todosCompletados = pasos.length > 0 && completados === pasos.length
-    return {
-      id: cat.id,
-      titulo: `${ui + 1}. ${cat.nombre}`,
-      pasos,
-      completados,
-      todosCompletados,
-      tieneActivo: !todosCompletados,
+  useEffect(() => {
+    let active = true
+    api.getLearningPath()
+      .then(data => { if (active) setModulos(Array.isArray(data) ? data : []) })
+      .catch(err => { if (active) setError(err.message || 'No se pudo cargar la ruta') })
+    return () => { active = false }
+  }, [])
+
+  const totalCompletados = (modulos || []).reduce((acc, m) => acc + m.progreso.completados, 0)
+  const totalPasos = (modulos || []).reduce((acc, m) => acc + m.progreso.total, 0)
+  const overall = totalPasos > 0 ? Math.round((totalCompletados / totalPasos) * 100) : 0
+
+  function abrirPaso(paso) {
+    if (paso.tipo_paso === 'actividad') {
+      navigate(`/actividades/${paso.actividad_id}`)
+    } else if (paso.publicacion_slug) {
+      navigate(`/lecturas/${paso.publicacion_slug}`)
+    } else {
+      navigate('/lecturas')
     }
-  })
+  }
 
   return (
     <div className="feed-container pb-4 fade-in">
@@ -69,7 +52,7 @@ export default function MyRoutePage() {
           <span className="font-extrabold text-xl">{overall}%</span>
         </div>
         <p className="text-xs opacity-70 mt-2">
-          {progress.filter(p => p.mejor_porcentaje === 100).length} de {progress.length} actividades completadas
+          {totalCompletados} de {totalPasos} pasos completados
         </p>
       </div>
 
@@ -98,10 +81,12 @@ export default function MyRoutePage() {
       {/* Unidades de aprendizaje */}
       <section>
         <h2 className="ar-section-title px-1">Unidades</h2>
+        {!modulos && !error && <LoadingState message="Cargando tu ruta…" />}
+        {error && <p className="px-1 text-sm text-red-600">{error}</p>}
         <div className="space-y-3">
-          {learningPath.map((unidad, ui) => {
-            const todosCompletados = unidad.todosCompletados
-            const tieneActivo = unidad.tieneActivo
+          {(modulos || []).map((unidad, ui) => {
+            const todosCompletados = unidad.progreso.total > 0 && unidad.progreso.completados === unidad.progreso.total
+            const tieneActivo = unidad.pasos.some(p => p.estado === 'AVAILABLE' || p.estado === 'IN_PROGRESS')
             return (
               <div key={unidad.id} className="ar-card overflow-hidden">
                 {/* Header de unidad */}
@@ -113,10 +98,10 @@ export default function MyRoutePage() {
                   </div>
                   <div className="flex-1">
                     <p className={`font-extrabold text-sm ${todosCompletados ? 'text-green-800' : tieneActivo ? 'text-[color:var(--ar-primary-dark)]' : 'text-slate-500'}`}>
-                      {unidad.titulo}
+                      {unidad.nombre}
                     </p>
                     <p className="text-xs text-[color:var(--ar-muted)] font-semibold">
-                      {unidad.completados}/{unidad.pasos.length} pasos
+                      {unidad.progreso.completados}/{unidad.progreso.total} pasos
                     </p>
                   </div>
                   {todosCompletados && <CheckCircle size={18} className="text-green-500" />}
@@ -126,35 +111,9 @@ export default function MyRoutePage() {
 
                 {/* Pasos */}
                 <div className="divide-y divide-slate-50">
-                  {unidad.pasos.map((paso, pi) => {
-                    const iconMap = { lectura: BookOpen, actividad: ClipboardList }
-                    const PasoIcon = iconMap[paso.tipo] || BookOpen
-                    const isActive = paso.estado === 'activo'
-                    const isCompleted = paso.estado === 'completado'
-                    const isLocked = paso.estado === 'bloqueado'
-                    return (
-                      <button
-                        key={paso.id}
-                        onClick={() => !isLocked && (paso.tipo === 'actividad'
-                          ? navigate(`/actividades/${paso.actividad_id}`)
-                          : paso.slug ? navigate(`/lecturas/${paso.slug}`) : navigate('/lecturas'))}
-                        disabled={isLocked}
-                        className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors
-                          ${isActive ? 'bg-[color:var(--ar-primary-light)] hover:bg-teal-100' : ''}
-                          ${isCompleted ? 'hover:bg-slate-50' : ''}
-                          ${isLocked ? 'cursor-not-allowed opacity-50' : 'cursor-pointer'}`}
-                      >
-                        <div className={`w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0
-                          ${isCompleted ? 'bg-green-100 text-green-600' : isActive ? 'bg-[color:var(--ar-primary)] text-white' : 'bg-slate-100 text-slate-400'}`}>
-                          {isCompleted ? <CheckCircle size={14} /> : isLocked ? <Lock size={12} /> : <PasoIcon size={13} />}
-                        </div>
-                        <span className={`text-sm font-semibold flex-1 ${isActive ? 'text-[color:var(--ar-primary-dark)] font-extrabold' : isCompleted ? 'text-slate-500 line-through' : 'text-slate-400'}`}>
-                          {paso.titulo}
-                        </span>
-                        {isActive && <ChevronRight size={16} className="text-[color:var(--ar-primary)]" />}
-                      </button>
-                    )
-                  })}
+                  {unidad.pasos.map(paso => (
+                    <ActivityPreview key={paso.id} paso={paso} onOpen={abrirPaso} />
+                  ))}
                   {unidad.pasos.length === 0 && (
                     <p className="px-4 py-3 text-xs text-[color:var(--ar-muted)]">Sin contenido aún en esta unidad</p>
                   )}

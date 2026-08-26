@@ -462,17 +462,5 @@ def obtener_progreso_estudiante(estudiante_id: int) -> list:
         close_db(conn)
 
 
-def obtener_ruta_aprendizaje() -> list:
-    """Devuelve las categorias activas como modulos de la ruta."""
-    conn = get_db()
-    try:
-        cursor = conn.execute(
-            "SELECT * FROM categorias WHERE activa = 1 ORDER BY area, nombre"
-        )
-        return list_to_dicts(cursor.fetchall())
-    finally:
-        close_db(conn)
-
-
 def buscar_actividades_por_area(area: str) -> list:
     return listar_actividades(area=area)

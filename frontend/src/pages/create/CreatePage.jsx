@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { useData } from '../../contexts/DataContext'
@@ -71,12 +71,32 @@ export default function CreatePage() {
   const [imageError, setImageError] = useState('')
   const [imageUploadWarning, setImageUploadWarning] = useState('')
   const [estiloVisual, setEstiloVisual] = useState({ acento: 'turquesa', patron: 'liso' })
+  const [etiquetas, setEtiquetas] = useState([])
+  const [etiquetasSugeridas, setEtiquetasSugeridas] = useState([])
+  const [nuevaEtiqueta, setNuevaEtiqueta] = useState('')
   const [recursosAdjuntos, setRecursosAdjuntos] = useState([])
   const [showLibrary, setShowLibrary] = useState(false)
   const [enviado, setEnviado] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const fileInputRef = useRef(null)
+
+  useEffect(() => {
+    api.getTags().then(setEtiquetasSugeridas).catch(() => {})
+  }, [])
+
+  const alternarEtiqueta = (nombre) => {
+    setEtiquetas(actuales => actuales.includes(nombre)
+      ? actuales.filter(e => e !== nombre)
+      : [...actuales, nombre])
+  }
+
+  const agregarEtiquetaNueva = () => {
+    const nombre = nuevaEtiqueta.trim()
+    if (!nombre || etiquetas.includes(nombre)) return
+    setEtiquetas(actuales => [...actuales, nombre])
+    setNuevaEtiqueta('')
+  }
 
   const canNext = () => {
     if (step === 1) return !!proposito
@@ -166,6 +186,13 @@ export default function CreatePage() {
           await Promise.all(recursosAdjuntos.map(r => api.addResourceToPublication(pubId, r.id)))
         } catch (err) {
           setImageUploadWarning(`La publicación se envió, pero no se pudieron adjuntar todos los recursos: ${err.message}`)
+        }
+      }
+      if (pubId && etiquetas.length) {
+        try {
+          await api.setPublicationTags(pubId, etiquetas)
+        } catch (err) {
+          setImageUploadWarning(`La publicación se envió, pero no se pudieron guardar las etiquetas: ${err.message}`)
         }
       }
 
@@ -417,6 +444,66 @@ export default function CreatePage() {
               placeholder="¿Sabían que…? ¿Qué opinan de…?"
               className="ar-input"
             />
+          </div>
+
+          <div className="rounded-2xl border border-[color:var(--ar-border)] p-4">
+            <p className="mb-1 text-sm font-extrabold text-slate-700">Etiquetas</p>
+            <p className="mb-3 text-xs text-[color:var(--ar-muted)]">
+              Opcional. Sirven para agrupar publicaciones por tus propios criterios (por ejemplo
+              «Laboratorio» o «Refuerzo»); no reemplazan al tema.
+            </p>
+
+            {etiquetas.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-3">
+                {etiquetas.map(nombre => (
+                  <button
+                    key={nombre}
+                    type="button"
+                    onClick={() => alternarEtiqueta(nombre)}
+                    className="inline-flex items-center gap-1 rounded-full bg-[color:var(--ar-primary)] px-2.5 py-1 text-[11px] font-bold text-white"
+                  >
+                    {nombre} <X size={12} />
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <div className="flex gap-2 mb-3">
+              <input
+                type="text"
+                value={nuevaEtiqueta}
+                onChange={e => setNuevaEtiqueta(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); agregarEtiquetaNueva() } }}
+                placeholder="Crear una etiqueta nueva"
+                maxLength={40}
+                className="ar-input flex-1"
+              />
+              <button
+                type="button"
+                onClick={agregarEtiquetaNueva}
+                disabled={!nuevaEtiqueta.trim()}
+                className="rounded-xl bg-slate-100 px-3 text-sm font-bold text-slate-700 hover:bg-slate-200 disabled:opacity-50"
+              >
+                Añadir
+              </button>
+            </div>
+
+            {etiquetasSugeridas.filter(e => !etiquetas.includes(e.nombre)).length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {etiquetasSugeridas
+                  .filter(e => !etiquetas.includes(e.nombre))
+                  .map(etiqueta => (
+                    <button
+                      key={etiqueta.id}
+                      type="button"
+                      onClick={() => alternarEtiqueta(etiqueta.nombre)}
+                      className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-600 hover:bg-slate-200"
+                    >
+                      + {etiqueta.nombre}
+                    </button>
+                  ))}
+              </div>
+            )}
           </div>
 
           <div className="rounded-2xl border border-[color:var(--ar-border)] p-4">
