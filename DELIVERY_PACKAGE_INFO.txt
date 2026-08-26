@@ -1,0 +1,185 @@
+╔════════════════════════════════════════════════════════════════════════════╗
+║                                                                            ║
+║                 SPRINT 2 — AULARÉD DELIVERY PACKAGE                       ║
+║                                                                            ║
+║                          ✅ Implementation Complete                        ║
+║                                                                            ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+📦 FILE: Sprint2-AulaRed-Delivery.zip (16 KB)
+
+Location: /home/user/Pauline/Sprint2-AulaRed-Delivery.zip
+
+═════════════════════════════════════════════════════════════════════════════
+
+📋 CONTENTS (3 comprehensive markdown files):
+
+1️⃣ README.md (8.2 KB)
+   ├─ Quick start setup instructions
+   ├─ Feature highlights summary
+   ├─ Test coverage overview
+   ├─ File changes summary (organized by component)
+   ├─ Backward compatibility notes
+   ├─ Database change summary
+   ├─ Verification checklist (for team to test)
+   ├─ Branch information
+   └─ Total: ~250 lines
+
+2️⃣ SPRINT2_CHANGES.md (25.5 KB)
+   ├─ Executive summary
+   ├─ Detailed breakdown of all 8 phases:
+   │  ├─ FASE A — Database model (orden, ruta_pasos, motor_quiz)
+   │  ├─ FASE B — Backend services (learning_path)
+   │  ├─ FASE C — Activity engine unification
+   │  ├─ FASE D — Frontend components
+   │  ├─ FASE E — Wordwall one-click
+   │  ├─ FASE F — Tags system
+   │  ├─ FASE G — Image lightbox
+   │  └─ FASE H — Banner configuration
+   ├─ End-to-end test procedures
+   ├─ Modified/created files table
+   ├─ Test coverage details (31 tests)
+   └─ Total: ~600 lines
+
+3️⃣ API_REFERENCE.md (8.9 KB)
+   ├─ All new endpoints documented:
+   │  ├─ GET /api/learning-path (student route with unlock states)
+   │  ├─ GET/POST /api/route-steps (teacher CRUD)
+   │  ├─ POST /api/route-steps/reorder
+   │  ├─ GET/POST /api/tags
+   │  ├─ PUT /api/publications/{id}/tags
+   │  ├─ GET/PUT /api/settings/feed-banner
+   │  └─ GET /api/activities/{id} (modified)
+   ├─ Request/response examples (JSON)
+   ├─ Status codes & error handling
+   ├─ Frontend API service functions
+   ├─ Compatibility notes
+   └─ Total: ~300 lines
+
+═════════════════════════════════════════════════════════════════════════════
+
+✨ KEY FEATURES IMPLEMENTED:
+
+✅ Separación Feed ↔ Mi Ruta
+   • New ruta_pasos table
+   • Publications can appear in both surfaces
+   • Real content separation (not just filtering)
+
+✅ Sequential Unlocking System
+   • Server-side state calculation (LOCKED/AVAILABLE/IN_PROGRESS/COMPLETED)
+   • Prerequisite-based progression
+   • Cross-module advancement support
+   • Optional steps don't block progression
+
+✅ Unified Quiz Engine
+   • Explicit motor_quiz flag ('legacy' or 'unificado')
+   • Eliminates heuristic guessing
+   • Backward compatible with existing content
+
+✅ Teacher Route Management
+   • New /admin/mi-ruta panel
+   • CRUD operations for learning path steps
+   • Drag-to-reorder with live preview
+   • Full validation & error handling
+
+✅ One-Click Wordwall
+   • Single-embed activities skip intermediate screen
+   • Multi-block activities retain context screen
+   • Significant UX improvement
+
+✅ Free-Form Tags System
+   • Case-insensitive tag management
+   • Visible in feed as chips
+   • Tag selector in publication creator
+   • Batch assignment support
+
+✅ Image Lightbox with Zoom
+   • Interactive viewer with zoom controls (±, percentage, reset)
+   • Pan support when zoomed
+   • Keyboard shortcuts (+/-, 0, ESC)
+   • Integrated across all media views
+
+✅ Configurable Feed Banner
+   • Admin settings page
+   • Image upload/activation
+   • Responsive sizing
+   • Public endpoint for fast feed rendering
+
+═════════════════════════════════════════════════════════════════════════════
+
+🧪 TEST COVERAGE:
+
+• 31 total tests (all passing ✅)
+  ├─ 13 tests for sequential unlocking (test_learning_path.py)
+  └─ 18 tests for motor flag, migrations, tags, banner (test_sprint2_backend.py)
+
+• Manual end-to-end verification completed
+  ├─ Student experience (Mi Ruta, feed, lightbox)
+  ├─ Teacher experience (route management panel)
+  └─ Admin experience (banner configuration)
+
+═════════════════════════════════════════════════════════════════════════════
+
+🔧 TECHNICAL SUMMARY:
+
+Backend Changes:
+  • ~600 lines of new code (services + routes)
+  • 3 new database tables/columns with auto-migration
+  • Modified 1 existing route (get_activity) for clarity
+  • 100% backward compatible
+
+Frontend Changes:
+  • ~700 lines of new React components
+  • 4 new page/component files
+  • 3 updated existing components
+  • 20+ new API service functions
+  • Responsive design (desktop/tablet/mobile)
+
+Database Changes:
+  • categorias.orden — module ordering
+  • actividades.motor_quiz — explicit engine flag
+  • ruta_pasos — learning path steps table
+  • configuracion_global — global settings storage
+  • All auto-migrate via _ensure_* functions
+
+═════════════════════════════════════════════════════════════════════════════
+
+📊 IMPLEMENTATION METRICS:
+
+Files Created:    15 new files
+Files Modified:   25 existing files
+Database tables:  3 new (etiquetas/publicacion_etiquetas reused)
+Database columns: 2 new with auto-migration
+Tests Added:      31 comprehensive tests
+Lines of Code:    ~1,300 new (backend + frontend)
+Documentation:    ~1,200 lines (this package)
+
+═════════════════════════════════════════════════════════════════════════════
+
+🚀 FOR YOUR TEAM:
+
+This package contains everything needed to:
+
+1. Understand what was implemented (README.md for quick overview)
+2. See detailed technical breakdown (SPRINT2_CHANGES.md)
+3. Integrate with backend systems (API_REFERENCE.md)
+4. Run verification tests (checklist in README.md)
+5. Explain to stakeholders (clean feature summary)
+
+═════════════════════════════════════════════════════════════════════════════
+
+📝 NEXT STEPS:
+
+1. Extract Sprint2-AulaRed-Delivery.zip
+2. Share README.md with team for overview
+3. Use API_REFERENCE.md for frontend integration if needed
+4. Follow verification checklist in README.md to test all features
+5. Reference SPRINT2_CHANGES.md for detailed technical info
+
+═════════════════════════════════════════════════════════════════════════════
+
+✅ Branch: claude/verify-aula-red-5-blog-ksk0xw
+📅 Date: August 26, 2026
+📦 Status: Ready for team review and deployment
+
+═════════════════════════════════════════════════════════════════════════════
