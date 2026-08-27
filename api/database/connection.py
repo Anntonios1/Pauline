@@ -139,10 +139,15 @@ def _ensure_categoria_orden_column(conn: sqlite3.Connection) -> None:
         return
     if "orden" not in _column_names(conn, "categorias"):
         conn.execute("ALTER TABLE categorias ADD COLUMN orden INTEGER")
+    # Rellena orden solo si no ha sido llenado (todos 0 o NULL)
+    # Detecta ambos casos: bases que ya tienen la columna con DEFAULT 0 (nuevas)
+    # y bases que no la tenían y se agregó vacía (antiguas).
+    max_orden = conn.execute("SELECT MAX(orden) FROM categorias").fetchone()[0]
+    if max_orden is None or max_orden == 0:
         conn.execute("""
             UPDATE categorias SET orden = (
                 SELECT COUNT(*) FROM categorias c2 WHERE c2.id <= categorias.id
-            ) WHERE orden IS NULL
+            )
         """)
 
 
@@ -157,11 +162,12 @@ def _ensure_actividad_motor_column(conn: sqlite3.Connection) -> None:
             "ALTER TABLE actividades ADD COLUMN motor_quiz TEXT NOT NULL DEFAULT 'legacy' "
             "CHECK (motor_quiz IN ('legacy','unificado'))"
         )
-        if "quizzes" in tables:
-            conn.execute(
-                "UPDATE actividades SET motor_quiz = 'unificado' "
-                "WHERE id IN (SELECT actividad_id FROM quizzes)"
-            )
+    # Siempre sincroniza: si hay actividades con quiz pero motor_quiz='legacy', actualiza.
+    if "quizzes" in tables:
+        conn.execute(
+            "UPDATE actividades SET motor_quiz = 'unificado' "
+            "WHERE motor_quiz = 'legacy' AND id IN (SELECT actividad_id FROM quizzes)"
+        )
 
 
 def list_to_dicts(rows: list) -> list:
