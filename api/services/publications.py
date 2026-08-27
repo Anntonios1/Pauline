@@ -114,6 +114,8 @@ def listar_publicaciones(estado: str = "aprobada", area: str = None, categoria_i
         cursor = conn.execute(query + " ORDER BY p.fecha_publicacion DESC", params)
         publicaciones = list_to_dicts(cursor.fetchall())
         _adjuntar_reacciones(conn, publicaciones, viewer_id)
+        from api.services.tags import adjuntar_etiquetas
+        adjuntar_etiquetas(conn, publicaciones)
         return publicaciones
     finally:
         close_db(conn)
@@ -250,6 +252,8 @@ def obtener_publicacion_por_slug(slug: str, viewer_id: int = None) -> dict:
         publicacion = dict(row)
         # La vista de lectura tambien muestra las reacciones, no solo el feed.
         _adjuntar_reacciones(conn, [publicacion], viewer_id)
+        from api.services.tags import adjuntar_etiquetas
+        adjuntar_etiquetas(conn, [publicacion])
         return publicacion
     finally:
         close_db(conn)

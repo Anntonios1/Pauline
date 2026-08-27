@@ -1,9 +1,10 @@
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import {
-  Home, Compass, Plus, Map, User, FileText, Shield,
+  Home, Compass, Plus, Map, Route, User, FileText, Shield,
   BookOpen, ClipboardList, FolderOpen, Star, Sparkles,
-  HelpCircle, LogOut, X, ArrowLeftRight, TrendingUp, CalendarDays, Users, FlaskConical
+  HelpCircle, LogOut, X, ArrowLeftRight, TrendingUp, CalendarDays, Users, FlaskConical,
+  Image as ImageIcon
 } from 'lucide-react'
 
 const studentSections = [
@@ -43,6 +44,7 @@ const teacherSections = [
       { path: '/admin/juegos',      label: 'Quizzes interactivos', icon: Sparkles },
       { path: '/admin/crear-juego', label: 'Crear quiz',            icon: Plus },
       { path: '/admin/mis-quizzes', label: 'Mis quizzes',           icon: ClipboardList },
+      { path: '/admin/mi-ruta',     label: 'Actividades Mi Ruta',   icon: Route },
       { path: '/admin/lecturas',    label: 'Lecturas',              icon: BookOpen },
       { path: '/admin/actividades', label: 'Actividades',          icon: ClipboardList },
       { path: '/admin/recursos',    label: 'Recursos',             icon: FolderOpen },
@@ -66,6 +68,7 @@ const teacherSections = [
     items: [
       { path: '/admin/progreso',   label: 'Progreso del grupo',   icon: TrendingUp },
       { path: '/admin/usuarios',   label: 'Usuarios',             icon: Users },
+      { path: '/admin/banner',     label: 'Banner del feed',      icon: ImageIcon },
       { path: '/admin/investigacion', label: 'Investigación',     icon: FlaskConical },
     ]
   },

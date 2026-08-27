@@ -35,6 +35,8 @@ import GameRoomPage from './pages/game/GameRoomPage'
 import GameJoinPage from './pages/game/GameJoinPage'
 import TeacherCreatorPage from './pages/teacher/TeacherCreatorPage'
 import MyQuizzesPage from './pages/teacher/MyQuizzesPage'
+import RouteManagerPage from './pages/teacher/RouteManagerPage'
+import FeedBannerPage from './pages/admin/FeedBannerPage'
 
 // Teacher/Admin pages
 import AdminDashboard from './pages/admin/AdminDashboard'
@@ -101,6 +103,7 @@ function App() {
           <Route path="eventos"      element={<ClassEventsPage />} />
           <Route path="progreso"     element={<ProgressPage />} />
           <Route path="usuarios"     element={<UsersPage />} />
+          <Route path="banner"       element={<FeedBannerPage />} />
           <Route path="investigacion" element={<ResearchPage />} />
           <Route path="perfil"       element={<TeacherProfilePage />} />
 
@@ -109,6 +112,7 @@ function App() {
           <Route path="crear-juego"     element={<TeacherCreatorPage />} />
           <Route path="crear-juego/:id" element={<TeacherCreatorPage />} />
           <Route path="mis-quizzes"  element={<MyQuizzesPage />} />
+          <Route path="mi-ruta"      element={<RouteManagerPage />} />
           <Route path="juegos"       element={<GameLauncherPage />} />
           <Route path="sala/:code"   element={<GameRoomPage />} />
 

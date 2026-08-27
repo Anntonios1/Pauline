@@ -60,6 +60,71 @@ export async function getLearningPath() {
   return fetchWithAuth('/learning-path')
 }
 
+export async function getRouteSteps(categoriaId) {
+  const searchParams = new URLSearchParams(categoriaId ? { categoria_id: categoriaId } : {})
+  return fetchWithAuth(`/route-steps?${searchParams}`)
+}
+
+export async function createRouteStep(data) {
+  return fetchWithAuth('/route-steps', { method: 'POST', body: JSON.stringify(data) })
+}
+
+export async function updateRouteStep(id, data) {
+  return fetchWithAuth(`/route-steps/${id}`, { method: 'PATCH', body: JSON.stringify(data) })
+}
+
+export async function deleteRouteStep(id) {
+  return fetchWithAuth(`/route-steps/${id}`, { method: 'DELETE' })
+}
+
+export async function reorderRouteSteps(categoriaId, orderedIds) {
+  return fetchWithAuth('/route-steps/reorder', {
+    method: 'POST',
+    body: JSON.stringify({ categoria_id: categoriaId, ordered_ids: orderedIds }),
+  })
+}
+
+export async function getFeedBanner() {
+  return fetchWithAuth('/settings/feed-banner')
+}
+
+export async function updateFeedBanner(data) {
+  return fetchWithAuth('/settings/feed-banner', { method: 'PUT', body: JSON.stringify(data) })
+}
+
+export async function uploadFeedBanner(file) {
+  const token = localStorage.getItem('token')
+  const formData = new FormData()
+  formData.append('banner', file)
+  const response = await fetch(`${BASE_URL}/settings/feed-banner`, {
+    method: 'POST',
+    headers: { ...(token && { Authorization: `Bearer ${token}` }) },
+    body: formData,
+  })
+  if (response.status === 401) {
+    handleUnauthorized()
+    throw new Error('Tu sesión expiró. Vuelve a iniciar sesión.')
+  }
+  const data = await response.json().catch(() => null)
+  if (!response.ok) throw new Error(data?.error || `Error ${response.status}`)
+  return data
+}
+
+export async function getTags() {
+  return fetchWithAuth('/tags')
+}
+
+export async function createTag(nombre) {
+  return fetchWithAuth('/tags', { method: 'POST', body: JSON.stringify({ nombre }) })
+}
+
+export async function setPublicationTags(publicationId, etiquetas) {
+  return fetchWithAuth(`/publications/${publicationId}/tags`, {
+    method: 'PUT',
+    body: JSON.stringify({ etiquetas }),
+  })
+}
+
 export async function getPublications(params = {}) {
   const searchParams = new URLSearchParams(params)
   return fetchWithAuth(`/publications?${searchParams}`)

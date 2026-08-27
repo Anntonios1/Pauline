@@ -44,6 +44,22 @@ function normalizeQuizPayload(payload, fallbackActivity) {
   }
 }
 
+/**
+ * Una actividad que es un solo bloque incrustado (Wordwall, YouTube, …) no
+ * gana nada con la pantalla intermedia de "Comenzar": el contenido es el
+ * juego en sí. En ese caso se entra directo y se ahorra un clic. Con varios
+ * bloques la pantalla sí aporta (instrucciones, cuántos bloques, tiempo).
+ */
+function esActividadDeUnSoloEmbed(items) {
+  if (!Array.isArray(items) || items.length !== 1) return false
+  const raw = items[0] || {}
+  let config = raw.config ?? raw.configuracion ?? {}
+  if (typeof config === 'string') {
+    try { config = JSON.parse(config) } catch { config = {} }
+  }
+  return Boolean(config?.embed_url || config?.wordwall_url)
+}
+
 function getAnswerValue(entry) {
   if (entry == null || typeof entry !== 'object' || Array.isArray(entry)) return entry
   if (Object.prototype.hasOwnProperty.call(entry, 'respuesta')) return entry.respuesta
@@ -118,6 +134,7 @@ export default function ActivityDetailPage() {
   const [runKey, setRunKey] = useState(0)
   const activeSubmission = useRef(null)
   const lastCompletion = useRef(null)
+  const autoStarted = useRef(null)
 
   useEffect(() => {
     let active = true
@@ -141,17 +158,11 @@ export default function ActivityDetailPage() {
           if (!baseActivity) throw error
         }
 
-        let payload = baseActivity
-        const hasLegacyQuestions = Array.isArray(baseActivity?.preguntas) && baseActivity.preguntas.length > 0
-        if (!hasLegacyQuestions) {
-          try {
-            payload = await api.getQuiz(id)
-          } catch {
-            // La actividad legacy aún puede estar vacía; se muestra su estado real.
-          }
-        }
-
-        if (active) setQuizData(normalizeQuizPayload(payload, baseActivity))
+        // `motor_quiz` (backend) ya decide de forma autoritativa qué motor de
+        // preguntas usa la actividad y `get_activity` devuelve `preguntas`/
+        // `items` resueltos para ambos casos — ya no hace falta un segundo
+        // fetch a /quiz para "adivinar" si el legacy vino vacío.
+        if (active) setQuizData(normalizeQuizPayload(baseActivity, baseActivity))
       } catch (error) {
         if (active) setLoadError(error.message || 'No se pudo cargar el quiz')
       }
@@ -200,6 +211,15 @@ export default function ActivityDetailPage() {
       setStarting(false)
     }
   }, [activity, attemptId, isTeacher, starting])
+
+  // Entra directo al juego cuando la actividad es un único bloque incrustado.
+  // El ref evita volver a entrar si el estudiante pulsa "Volver al detalle".
+  useEffect(() => {
+    if (!quizData || started || autoStarted.current === id) return
+    if (!esActividadDeUnSoloEmbed(items)) return
+    autoStarted.current = id
+    handleStart()
+  }, [quizData, items, started, id, handleStart])
 
   const persistCompletion = useCallback(async (completion) => {
     if (!activity || activeSubmission.current) return activeSubmission.current

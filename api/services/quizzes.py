@@ -651,8 +651,8 @@ def crear_quiz(payload: dict, actor_id: int) -> dict:
             """
             INSERT INTO actividades
                 (titulo, descripcion, instrucciones, area, categoria_id, tipo, dificultad,
-                 tiempo_limite_segundos, intentos_maximos, creado_por, activa)
-            VALUES (?, ?, ?, ?, ?, 'interactive_quiz', ?, ?, ?, ?, ?)
+                 tiempo_limite_segundos, intentos_maximos, creado_por, activa, motor_quiz)
+            VALUES (?, ?, ?, ?, ?, 'interactive_quiz', ?, ?, ?, ?, ?, 'unificado')
             """,
             (
                 data["titulo"], data.get("descripcion"), data.get("instrucciones"), data["area"],

@@ -7,11 +7,12 @@
  * dentro, un video se reproduce dentro. Antes todo lo que no fuera imagen o
  * audio era un enlace "Abrir" que mandaba a otra pestaña.
  */
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import {
   Download, ExternalLink, FileText, Gamepad2, Headphones, Maximize2,
-  Pause, Play, Volume2, VolumeX, X,
+  Pause, Play, Volume2, VolumeX,
 } from 'lucide-react'
+import ImageViewer from './ImageViewer'
 
 const VELOCIDADES = [0.75, 1, 1.25, 1.5]
 
@@ -89,14 +90,6 @@ function formatoTiempo(segundos) {
 function VisorImagen({ entry, compact }) {
   const [ampliada, setAmpliada] = useState(false)
 
-  // Escape cierra la vista ampliada: es la tecla que todo el mundo intenta.
-  useEffect(() => {
-    if (!ampliada) return undefined
-    const alPulsar = (event) => event.key === 'Escape' && setAmpliada(false)
-    window.addEventListener('keydown', alPulsar)
-    return () => window.removeEventListener('keydown', alPulsar)
-  }, [ampliada])
-
   return (
     <>
       <figure className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
@@ -121,27 +114,11 @@ function VisorImagen({ entry, compact }) {
       </figure>
 
       {ampliada && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 p-4"
-          onClick={() => setAmpliada(false)}
-          role="dialog"
-          aria-modal="true"
-        >
-          <button
-            type="button"
-            onClick={() => setAmpliada(false)}
-            className="absolute right-4 top-4 rounded-full bg-white/15 p-2 text-white hover:bg-white/25"
-            aria-label="Cerrar"
-          >
-            <X size={22} />
-          </button>
-          <img
-            src={entry.url}
-            alt={entry.alt || entry.title || ''}
-            className="max-h-full max-w-full object-contain"
-            onClick={(event) => event.stopPropagation()}
-          />
-        </div>
+        <ImageViewer
+          url={entry.url}
+          alt={entry.alt || entry.title || ''}
+          onClose={() => setAmpliada(false)}
+        />
       )}
     </>
   )
